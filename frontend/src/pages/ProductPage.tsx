@@ -48,7 +48,6 @@ export function ProductPage() {
           <h1 className="detail__name">{product.name}</h1>
           <p className="detail__meta">
             at {storeName}
-            {product.category ? `, ${product.category.toLowerCase()}` : ""}
           </p>
         </div>
         {s && (

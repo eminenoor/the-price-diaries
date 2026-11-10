@@ -19,6 +19,7 @@ class ParsedPrice:
     in_stock: bool = True
     source: str = "unknown"  # which strategy found it; handy when debugging
     member_price: float | None = None  # loyalty-card price, e.g. Gratis Gold & Platinum
+    image_url: str | None = None  # product photo (og:image or JSON-LD), https only
 
 
 class PriceNotFoundError(LookupError):
@@ -47,7 +48,7 @@ class Parser:
                 member = _member_price(soup, self.member_labels)
                 if member is not None and member < result.price:
                     result = replace(result, member_price=member)
-                return result
+                return replace(result, image_url=_image_url(soup))
         raise PriceNotFoundError("No price found on page. Try adding a 'selector' for it.")
 
     def explain(self, html: str, selector: str | None = None) -> dict[str, float | None]:
@@ -163,6 +164,31 @@ def _member_price(soup: BeautifulSoup, labels: tuple[str, ...]) -> float | None:
                     if re.search(r"\d", after):
                         return parse_price(after)
                 element = element.parent
+    return None
+
+
+def _image_url(soup: BeautifulSoup) -> str | None:
+    """The product photo: og:image first, then the JSON-LD Product image.
+
+    Only absolute https URLs are kept. The browser loads them, never the server.
+    """
+    candidates: list[Any] = []
+    for attrs in ({"property": "og:image"}, {"name": "og:image"}):
+        tag = soup.find("meta", attrs=attrs)
+        if tag is not None:
+            candidates.append(tag.get("content"))
+    for tag in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(tag.string or "")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        for node in _walk(data):
+            if _is_type(node, "Product"):
+                for image in _as_list(node.get("image")):
+                    candidates.append(image.get("url") if isinstance(image, dict) else image)
+    for url in candidates:
+        if isinstance(url, str) and url.startswith("https://") and len(url) <= 2048:
+            return url.strip()
     return None
 
 

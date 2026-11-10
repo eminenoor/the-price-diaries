@@ -8,7 +8,6 @@ export function AddProductForm() {
   const [url, setUrl] = useState("");
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
-  const [category, setCategory] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: FormEvent) {
@@ -27,13 +26,11 @@ export function AddProductForm() {
       await add.mutateAsync({
         url: url.trim(),
         name: name.trim(),
-        category: category.trim() || undefined,
         target_price: targetNumber,
       });
       setUrl("");
       setName("");
       setTarget("");
-      setCategory("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save this product.");
     }
@@ -61,14 +58,6 @@ export function AddProductForm() {
             placeholder="Vitamin C serum"
             value={name}
             onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <label className="field field--short">
-          <span className="field__label">Category</span>
-          <input
-            placeholder="Serum"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
           />
         </label>
         <label className="field field--short">

@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import Float, ForeignKey, Index, String, create_engine, event, func
+from sqlalchemy import Float, ForeignKey, Index, String, create_engine, event, false, func
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -22,6 +22,26 @@ class Base(DeclarativeBase):
     pass
 
 
+class Category(Base):
+    """A "floor" (top level, e.g. Skincare) or a "room" inside one (e.g. Toners).
+
+    Only two levels: a room's parent is always a floor.
+    """
+
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50))
+    parent_id: Mapped[int | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="CASCADE"), index=True
+    )
+    color: Mapped[str] = mapped_column(String(7))  # "#RRGGBB"
+
+    rooms: Mapped[list[Category]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True, order_by="Category.name"
+    )
+
+
 class Product(Base):
     __tablename__ = "products"
 
@@ -29,10 +49,15 @@ class Product(Base):
     url: Mapped[str] = mapped_column(String(2048), unique=True)
     name: Mapped[str] = mapped_column(String(200))
     store: Mapped[str] = mapped_column(String(32), index=True)
-    category: Mapped[str | None] = mapped_column(String(50))
+    category_id: Mapped[int | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="SET NULL"), index=True
+    )
     selector: Mapped[str | None] = mapped_column(String(300))
     target_price: Mapped[float | None] = mapped_column(Float)
+    image_url: Mapped[str | None] = mapped_column(String(2048))  # from the store page
     last_error: Mapped[str | None] = mapped_column(String(500))
+    # The store refused the last check (403 or an "Access Denied" page).
+    blocked: Mapped[bool] = mapped_column(default=False, server_default=false())
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     prices: Mapped[list[PricePoint]] = relationship(

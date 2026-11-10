@@ -13,17 +13,40 @@ class StoreOut(BaseModel):
     domains: list[str]
 
 
+HEX_COLOR = r"^#[0-9A-Fa-f]{6}$"
+
+
+class CategoryOut(BaseModel):
+    id: int
+    name: str
+    parent_id: int | None = Field(description="None for a floor; the floor's id for a room.")
+    color: str
+
+
+class CategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+    parent_id: int | None = Field(default=None, description="Set to a floor's id to add a room.")
+    color: str | None = Field(
+        default=None, pattern=HEX_COLOR, description="Defaults to the floor's."
+    )
+
+
+class CategoryUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=50)
+    color: str | None = Field(default=None, pattern=HEX_COLOR)
+
+
 class ProductCreate(BaseModel):
     url: str = Field(max_length=2048, examples=["https://www.gratis.com/urun-p-12345"])
     name: str = Field(min_length=1, max_length=200)
-    category: str | None = Field(default=None, max_length=50)
+    category_id: int | None = Field(default=None, description="A room or a floor.")
     target_price: float | None = Field(default=None, gt=0)
     selector: str | None = Field(default=None, max_length=300)
 
 
 class ProductUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    category: str | None = Field(default=None, max_length=50)
+    category_id: int | None = None
     target_price: float | None = Field(default=None, gt=0)
     selector: str | None = Field(default=None, max_length=300)
 
@@ -46,9 +69,11 @@ class ProductOut(BaseModel):
     url: str
     name: str
     store: str
-    category: str | None
+    category_id: int | None
     target_price: float | None
+    image_url: str | None = Field(default=None, description="Product photo from the store.")
     last_error: str | None
+    blocked: bool = Field(default=False, description="The store refuses automated checks.")
     created_at: datetime
     summary: Summary | None
     regular_price: float | None = Field(

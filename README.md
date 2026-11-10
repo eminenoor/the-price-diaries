@@ -82,7 +82,7 @@ cd price-diaries
 # Backend
 cd backend
 uv sync
-uv run price-diaries demo        # optional: adds 7 demo products with 90 days of history
+uv run price-diaries demo        # optional: adds 12 demo products across all four floors
 uv run price-diaries serve       # API on http://127.0.0.1:8000
 
 # Frontend, in a second terminal

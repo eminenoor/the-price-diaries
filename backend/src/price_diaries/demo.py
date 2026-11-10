@@ -1,63 +1,147 @@
 """Fill the database with realistic fake price history.
 
 For developing the UI and taking README screenshots, so real scraped data
-never needs to be published.
+never needs to be published. Every floor and every state the UI can show
+(good deal, fake sale, no change, price up, blocked store, member price,
+not checked yet) appears at least once, and the result is the same every run.
 """
 
 from __future__ import annotations
 
 import random
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Literal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from price_diaries.db import PricePoint, Product
+from price_diaries.db import Category, PricePoint, Product
+from price_diaries.fetcher import StoreBlockedError
+
+Ending = Literal["deal", "fake", "steady", "up", "blocked", "waiting"]
+
+
+@dataclass(frozen=True)
+class DemoProduct:
+    name: str
+    store: str
+    floor: str
+    room: str
+    base: float
+    ending: Ending
+    member_share: float | None = None  # loyalty-card price as a share of the shelf price
+
 
 DEMO_PRODUCTS = [
-    ("Hyaluronic Acid Serum 30 ml", "gratis", "Serum", 289.0),
-    ("SPF 50+ Fluid Sunscreen 50 ml", "watsons", "Sun care", 349.0),
-    ("Gentle Foaming Cleanser 150 ml", "rossmann", "Cleanser", 159.0),
-    ("Niacinamide 10% Toner 200 ml", "trendyol", "Toner", 210.0),
-    ("Ceramide Barrier Cream 50 ml", "sephora", "Moisturizer", 645.0),
-    ("Retinol 0.3% Night Serum", "eveshop", "Serum", 399.0),
-    ("Micellar Water 400 ml", "amazon", "Cleanser", 189.0),
+    DemoProduct("AHA BHA PHA Toner 150 ml", "gratis", "Skincare", "Toners", 950, "deal", 0.52),
+    DemoProduct("Niacinamide 10% Toner 200 ml", "trendyol", "Skincare", "Toners", 210, "steady"),
+    DemoProduct(
+        "Vitamin C 15% Serum 30 ml", "eveshop", "Skincare", "Vitamin C serums", 399, "deal"
+    ),
+    DemoProduct("SPF 50+ Fluid Sunscreen 50 ml", "watsons", "Skincare", "Sun care", 349, "fake"),
+    DemoProduct(
+        "Ceramide Barrier Cream 50 ml", "sephora", "Skincare", "Moisturizers", 645, "blocked"
+    ),
+    DemoProduct("Gentle Foaming Cleanser 150 ml", "rossmann", "Skincare", "Cleansers", 159, "up"),
+    DemoProduct("Single-Origin Filter Coffee 500 g", "amazon", "Pantry", "Coffee", 420, "steady"),
+    DemoProduct("Cold-Pressed Olive Oil 1 l", "trendyol", "Pantry", "Olive oil", 610, "deal"),
+    DemoProduct("Laundry Liquid 2.5 l", "rossmann", "Cleaning", "Laundry", 289, "fake"),
+    DemoProduct("Dishwasher Tablets 60 pcs", "amazon", "Cleaning", "Kitchen", 499, "waiting"),
+    DemoProduct(
+        "Vitamin D3 1000 IU, 90 tablets", "gratis", "Supplements", "Vitamins", 275, "steady"
+    ),
+    DemoProduct(
+        "Magnesium Bisglycinate 120 caps", "watsons", "Supplements", "Minerals", 389, "deal"
+    ),
 ]
+
+_FLOOR_COLOR = "#D9D2C3"
+_SCRIPTED_DAYS = 15  # the last two weeks are scripted so each ending is certain
+
+
+def room_for(session: Session, floor_name: str, room_name: str) -> Category:
+    """Find or create a room on a floor (and the floor, if needed)."""
+    floor = session.scalar(
+        select(Category).where(Category.name == floor_name, Category.parent_id.is_(None))
+    )
+    if floor is None:
+        floor = Category(name=floor_name, color=_FLOOR_COLOR)
+        session.add(floor)
+        session.flush()
+    room = session.scalar(
+        select(Category).where(Category.name == room_name, Category.parent_id == floor.id)
+    )
+    if room is None:
+        room = Category(name=room_name, parent_id=floor.id, color=floor.color)
+        session.add(room)
+        session.flush()
+    return room
+
+
+def _random_walk(rng: random.Random, base: float, days: int) -> list[float]:
+    """Mostly the regular price, with occasional real sales and raise-then-'discount' tricks."""
+    prices, price, trick_until = [], base, -1
+    for day in range(days):
+        roll = rng.random()
+        if day == trick_until:  # the "sale" after an artificial raise
+            price = base
+        elif roll < 0.025:  # raise now, "discount" a few days later
+            price = round(base * rng.uniform(1.15, 1.30), 2)
+            trick_until = day + rng.randint(2, 5)
+        elif roll < 0.06:  # a real sale
+            price = round(base * rng.uniform(0.80, 0.92), 2)
+        elif roll < 0.20 and trick_until < day:
+            price = base
+        prices.append(price)
+    return prices
+
+
+def _ending(ending: Ending, base: float, history: list[float]) -> list[float]:
+    """The scripted last two weeks."""
+    flat = [base] * (_SCRIPTED_DAYS - 1)
+    if ending == "deal":  # a new all-time low today
+        return [*flat, round(min([*history, base]) * 0.93, 2)]
+    if ending == "fake":  # raised 25 % for four days, then "discounted" back to normal
+        return [base] * 9 + [round(base * 1.25, 2)] * 4 + [base] * 2
+    if ending == "up":
+        return [*flat, round(base * 1.06, 2)]
+    return [*flat, base]  # steady, blocked
 
 
 def seed_demo(session: Session, days: int = 90, seed: int = 7) -> int:
     rng = random.Random(seed)
-    start = datetime.now().replace(hour=9, minute=17, second=0, microsecond=0)
-    start -= timedelta(days=days)
+    today = datetime.now().replace(hour=9, minute=17, second=0, microsecond=0)
+    days = max(days, _SCRIPTED_DAYS)
 
-    for i, (name, store, category, base) in enumerate(DEMO_PRODUCTS):
+    for i, demo in enumerate(DEMO_PRODUCTS):
         product = Product(
-            url=f"https://demo.invalid/{store}/{i}",
-            name=name,
-            store=store,
-            category=category,
-            target_price=round(base * 0.85),
+            url=f"https://demo.invalid/{demo.store}/{i}",
+            name=demo.name,
+            store=demo.store,
+            category_id=room_for(session, demo.floor, demo.room).id,
+            target_price=round(demo.base * 0.85),
         )
+        if demo.ending == "blocked":
+            error = StoreBlockedError(f"www.{demo.store}.com.tr", 403)
+            product.last_error, product.blocked = str(error), True
         session.add(product)
         session.flush()
+        if demo.ending == "waiting":
+            continue
 
-        price, trick_until = base, -1
-        for day in range(days + 1):
-            roll = rng.random()
-            if day == trick_until:  # the "sale" after an artificial raise
-                price = base
-            elif roll < 0.025:  # raise now, "discount" a few days later
-                price = round(base * rng.uniform(1.15, 1.30), 2)
-                trick_until = day + rng.randint(2, 5)
-            elif roll < 0.06:  # a real sale
-                price = round(base * rng.uniform(0.75, 0.92), 2)
-            elif roll < 0.20 and trick_until < day:
-                price = base
+        history = _random_walk(rng, demo.base, days + 1 - _SCRIPTED_DAYS)
+        prices = history + _ending(demo.ending, demo.base, history)
+        start = today - timedelta(days=len(prices) - 1)
+        for day, price in enumerate(prices):
+            member = round(price * demo.member_share, 2) if demo.member_share else None
             session.add(
                 PricePoint(
                     product_id=product.id,
                     price=price,
+                    member_price=member,
                     currency="TRY",
-                    in_stock=rng.random() > 0.02,
+                    in_stock=day == len(prices) - 1 or rng.random() > 0.02,
                     checked_at=start + timedelta(days=day),
                 )
             )

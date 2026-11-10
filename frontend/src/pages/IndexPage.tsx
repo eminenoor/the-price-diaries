@@ -1,4 +1,3 @@
-import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { Product } from "../api";
@@ -10,13 +9,7 @@ import { useProducts, useStores } from "../hooks";
 
 export function IndexPage() {
   const { data: products = [], isLoading, error } = useProducts();
-  const [category, setCategory] = useState<string | null>(null);
-
-  const categories = useMemo(
-    () => [...new Set(products.map((p) => p.category).filter(Boolean) as string[])].sort(),
-    [products],
-  );
-  const visible = category ? products.filter((p) => p.category === category) : products;
+  const visible = products;
   const feature = pickFeature(products);
 
   if (isLoading) return <p className="status">Loading your products…</p>;
@@ -38,18 +31,6 @@ export function IndexPage() {
             <h2 id="index-title" className="index__title">
               Everything you're watching
             </h2>
-            {categories.length > 1 && (
-              <nav className="filters" aria-label="Filter by category">
-                <FilterButton active={category === null} onClick={() => setCategory(null)}>
-                  All
-                </FilterButton>
-                {categories.map((c) => (
-                  <FilterButton key={c} active={category === c} onClick={() => setCategory(c)}>
-                    {c}
-                  </FilterButton>
-                ))}
-              </nav>
-            )}
           </div>
           <ol className="rows">
             {visible.map((p) => (
@@ -114,7 +95,6 @@ function ProductRow({ product }: { product: Product }) {
         <span className="row__name">{product.name}</span>
         <span className="row__store">
           {storeName}
-          {product.category ? `, ${product.category.toLowerCase()}` : ""}
         </span>
       </Link>
       <Sparkline values={product.sparkline} label={`Price trend for ${product.name}`} />
@@ -132,18 +112,6 @@ function ProductRow({ product }: { product: Product }) {
   );
 }
 
-function FilterButton(props: { active: boolean; onClick: () => void; children: string }) {
-  return (
-    <button
-      type="button"
-      className={`filter ${props.active ? "is-active" : ""}`}
-      aria-pressed={props.active}
-      onClick={props.onClick}
-    >
-      {props.children}
-    </button>
-  );
-}
 
 function useStoreName(key: string): string {
   const { data: stores = [] } = useStores();

@@ -136,3 +136,32 @@ def test_explain_lists_every_strategy():
     assert found["json-ld"] == 950.0
     assert found["member price"] == 490.0
     assert found["meta tags"] is None
+
+
+@pytest.mark.parametrize(
+    ("html", "expected"),
+    [
+        (
+            '<meta property="og:image" content="https://cdn.example/toner.jpg">' + JSON_LD_PAGE,
+            "https://cdn.example/toner.jpg",
+        ),
+        (
+            '<script type="application/ld+json">{"@type": "Product", "image": '
+            '["https://cdn.example/a.jpg"], "offers": {"price": 10}}</script>',
+            "https://cdn.example/a.jpg",
+        ),
+        (
+            '<script type="application/ld+json">{"@type": "Product", "image": '
+            '{"@type": "ImageObject", "url": "https://cdn.example/b.jpg"}, '
+            '"offers": {"price": 10}}</script>',
+            "https://cdn.example/b.jpg",
+        ),
+        # Not https, or relative: ignored.
+        ('<meta property="og:image" content="http://cdn.example/a.jpg">' + JSON_LD_PAGE, None),
+        ('<meta property="og:image" content="/img/a.jpg">' + JSON_LD_PAGE, None),
+        ('<meta property="og:image" content="javascript:alert(1)">' + JSON_LD_PAGE, None),
+        (JSON_LD_PAGE, None),
+    ],
+)
+def test_product_image(html, expected):
+    assert Parser().parse(html).image_url == expected

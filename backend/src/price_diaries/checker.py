@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from price_diaries.db import PricePoint, Product
-from price_diaries.fetcher import FetchError
+from price_diaries.fetcher import FetchError, StoreBlockedError
 from price_diaries.parsers import ParsedPrice, PriceNotFoundError, store_for_host
 
 log = logging.getLogger(__name__)
@@ -62,6 +62,11 @@ async def fetch_price(product: Product, source: PageSource, browser_fallback: bo
     return parser.parse(html, selector=product.selector)
 
 
+def _is_blocked(exc: Exception) -> bool:
+    """The store refuses automated checks. A 429 (slow down) is temporary, so it isn't."""
+    return isinstance(exc, StoreBlockedError) and exc.status != 429
+
+
 async def check_product(
     session: Session, product: Product, source: PageSource, browser_fallback: bool = True
 ) -> CheckOutcome:
@@ -69,6 +74,7 @@ async def check_product(
         parsed = await fetch_price(product, source, browser_fallback)
     except (FetchError, PriceNotFoundError) as exc:
         product.last_error = str(exc)[:500]
+        product.blocked = _is_blocked(exc)
         session.commit()
         log.warning("%s: %s", product.name, exc)
         return CheckOutcome(product.id, ok=False, error=product.last_error)
@@ -84,6 +90,8 @@ async def check_product(
         )
     )
     product.last_error = None
+    product.blocked = False
+    product.image_url = parsed.image_url or product.image_url
     session.commit()
     log.info("%s: %.2f %s (%s)", product.name, parsed.price, parsed.currency, parsed.source)
     return CheckOutcome(product.id, ok=True, price=parsed.member_price or parsed.price)
@@ -106,6 +114,7 @@ async def check_all(
     for product, result in zip(products, prices, strict=True):
         if isinstance(result, (FetchError, PriceNotFoundError)):
             product.last_error = str(result)[:500]
+            product.blocked = _is_blocked(result)
             outcomes.append(CheckOutcome(product.id, ok=False, error=product.last_error))
         elif isinstance(result, BaseException):
             raise result
@@ -121,6 +130,8 @@ async def check_all(
                 )
             )
             product.last_error = None
+            product.blocked = False
+            product.image_url = result.image_url or product.image_url
             outcomes.append(
                 CheckOutcome(product.id, ok=True, price=result.member_price or result.price)
             )

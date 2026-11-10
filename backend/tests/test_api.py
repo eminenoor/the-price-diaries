@@ -1,3 +1,6 @@
+from price_diaries.fetcher import StoreBlockedError
+from tests.conftest import FakeFetcher
+
 PAGE = (
     '<script type="application/ld+json">'
     '{"@type": "Product", "offers": {"price": "289.90", "priceCurrency": "TRY"}}'
@@ -7,7 +10,7 @@ URL = "https://www.gratis.com/serum-p-1"
 
 
 def add_product(client, **overrides):
-    body = {"url": URL, "name": "Serum", "category": "Serum", "target_price": 300} | overrides
+    body = {"url": URL, "name": "Serum", "target_price": 300} | overrides
     return client.post("/api/products", json=body)
 
 
@@ -131,3 +134,43 @@ def test_regular_price_when_member_prices_off(settings, fake_pages):
         detail = client.get(f"/api/products/{product_id}").json()
     assert detail["summary"]["current"] == 289.9
     assert detail["regular_price"] is None
+
+
+def test_check_stores_product_photo(client, fake_pages):
+    fake_pages[URL] = '<meta property="og:image" content="https://cdn.example/serum.jpg">' + PAGE
+    product_id = add_product(client).json()["id"]
+    assert client.get(f"/api/products/{product_id}").json()["image_url"] is None
+    client.post(f"/api/products/{product_id}/check")
+    assert client.get(f"/api/products/{product_id}").json()["image_url"] == (
+        "https://cdn.example/serum.jpg"
+    )
+
+
+def test_blocked_store_is_flagged(client, monkeypatch):
+    async def refuse(self, url):
+        raise StoreBlockedError("www.gratis.com", 403)
+
+    monkeypatch.setattr(FakeFetcher, "get", refuse)
+    product_id = add_product(client).json()["id"]
+    result = client.post(f"/api/products/{product_id}/check").json()
+    assert result["ok"] is False
+    product = client.get(f"/api/products/{product_id}").json()
+    assert product["blocked"] is True
+    assert "blocks automated price checks" in product["last_error"]
+
+
+def test_rate_limit_is_not_a_block(client, monkeypatch):
+    async def slow_down(self, url):
+        raise StoreBlockedError("www.gratis.com", 429)
+
+    monkeypatch.setattr(FakeFetcher, "get", slow_down)
+    product_id = add_product(client).json()["id"]
+    client.post(f"/api/products/{product_id}/check")
+    assert client.get(f"/api/products/{product_id}").json()["blocked"] is False
+
+
+def test_successful_check_clears_block(client, fake_pages):
+    fake_pages[URL] = PAGE
+    product_id = add_product(client).json()["id"]
+    client.post(f"/api/products/{product_id}/check")
+    assert client.get(f"/api/products/{product_id}").json()["blocked"] is False

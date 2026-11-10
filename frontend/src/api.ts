@@ -6,6 +6,21 @@ export interface Store {
   domains: string[];
 }
 
+/** A floor (parent_id null, e.g. Skincare) or a room on a floor (e.g. Toners). */
+export interface Category {
+  id: number;
+  name: string;
+  parent_id: number | null;
+  /** "#RRGGBB" */
+  color: string;
+}
+
+export interface NewCategory {
+  name: string;
+  parent_id?: number;
+  color?: string;
+}
+
 export interface Summary {
   current: number;
   previous: number | null;
@@ -24,9 +39,14 @@ export interface Product {
   url: string;
   name: string;
   store: string;
-  category: string | null;
+  /** A room (or a floor). See Category. */
+  category_id: number | null;
   target_price: number | null;
+  /** Product photo from the store page (https), or null. */
+  image_url: string | null;
   last_error: string | null;
+  /** The store refuses automated checks (blinds down). */
+  blocked: boolean;
   created_at: string;
   summary: Summary | null;
   /** Latest shelf price, set only when the main price shown is a member price. */
@@ -64,7 +84,7 @@ export interface CheckResult {
 export interface NewProduct {
   url: string;
   name: string;
-  category?: string;
+  category_id?: number;
   target_price?: number;
 }
 
@@ -92,6 +112,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   stores: () => request<Store[]>("/stores"),
+  categories: () => request<Category[]>("/categories"),
+  createCategory: (body: NewCategory) =>
+    request<Category>("/categories", { method: "POST", body: JSON.stringify(body) }),
+  updateCategory: (id: number, body: Partial<Pick<Category, "name" | "color">>) =>
+    request<Category>(`/categories/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  removeCategory: (id: number) => request<void>(`/categories/${id}`, { method: "DELETE" }),
   products: () => request<Product[]>("/products"),
   product: (id: number) => request<ProductDetail>(`/products/${id}`),
   create: (body: NewProduct) =>
