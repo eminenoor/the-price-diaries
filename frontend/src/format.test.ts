@@ -27,6 +27,7 @@ const product = (overrides: Partial<Product> = {}): Product => ({
   last_error: null,
   created_at: "2026-09-01T09:00:00",
   summary: summary(),
+  regular_price: null,
   sparkline: [],
   ...overrides,
 });

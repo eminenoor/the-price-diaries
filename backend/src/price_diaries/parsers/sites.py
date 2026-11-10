@@ -24,9 +24,11 @@ class Store:
     domains: tuple[str, ...]
     selectors: tuple[str, ...] = ()
     needs_browser: bool = False  # prices rendered by JavaScript
+    # Text next to the loyalty-card price, as regular expressions.
+    member_labels: tuple[str, ...] = ()
 
     def parser(self) -> Parser:
-        return Parser((*self.selectors, *_COMMON))
+        return Parser((*self.selectors, *_COMMON), self.member_labels)
 
 
 STORES: tuple[Store, ...] = (
@@ -35,12 +37,15 @@ STORES: tuple[Store, ...] = (
         "Gratis",
         ("gratis.com", "www.gratis.com"),
         ("[class*='discounted-price' i]", "[class*='price' i]"),
+        member_labels=(r"Özel\s*Fiyat",),  # "Gold&Platinum Özel Fiyat"
     ),
     Store(
         "trendyol",
         "Trendyol",
         ("trendyol.com", "www.trendyol.com"),
-        (".prc-dsc", ".product-price-container .prc-org", "[class*='price' i]"),
+        # No catch-all "[class*='price']": it matches the "Son 14 Günün En Düşük
+        # Fiyatı!" banner and records 14 TL.
+        (".price-view .discounted", ".prc-dsc", ".product-price-container .prc-org"),
         needs_browser=True,
     ),
     Store(

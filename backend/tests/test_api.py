@@ -89,3 +89,45 @@ def test_serves_built_frontend(settings, fake_pages, tmp_path):
         assert "root" in client.get("/products/3").text  # SPA route
         assert "nope" not in client.get("/..%2Fsecret.txt").text  # path traversal
         assert client.get("/api/health").json() == {"status": "ok"}
+
+
+MEMBER_PAGE = PAGE + "<div><p>Gold&amp;Platinum Özel Fiyat</p><p>149,90 TL</p></div>"
+
+
+def test_member_price_is_used(client, fake_pages):
+    fake_pages[URL] = MEMBER_PAGE
+    product_id = add_product(client).json()["id"]
+    assert client.post(f"/api/products/{product_id}/check").json()["price"] == 149.9
+
+    detail = client.get(f"/api/products/{product_id}").json()
+    assert detail["summary"]["current"] == 149.9
+    assert detail["regular_price"] == 289.9
+    assert detail["history"][0]["member_price"] == 149.9
+
+
+def test_member_price_found_after_javascript(client, fake_pages, monkeypatch):
+    """Raw HTML has only the regular price; the rendered page adds the member price."""
+    from tests.conftest import FakeFetcher
+
+    async def rendered(self, url):
+        return MEMBER_PAGE
+
+    monkeypatch.setattr(FakeFetcher, "get_rendered", rendered)
+    fake_pages[URL] = PAGE
+    product_id = add_product(client).json()["id"]
+    assert client.post(f"/api/products/{product_id}/check").json()["price"] == 149.9
+
+
+def test_regular_price_when_member_prices_off(settings, fake_pages):
+    from fastapi.testclient import TestClient
+
+    from price_diaries.api import create_app
+
+    settings.use_member_prices = False
+    fake_pages[URL] = MEMBER_PAGE
+    with TestClient(create_app(settings)) as client:
+        product_id = add_product(client).json()["id"]
+        client.post(f"/api/products/{product_id}/check")
+        detail = client.get(f"/api/products/{product_id}").json()
+    assert detail["summary"]["current"] == 289.9
+    assert detail["regular_price"] is None

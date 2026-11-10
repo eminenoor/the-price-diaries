@@ -32,6 +32,32 @@ class FetchError(RuntimeError):
     pass
 
 
+class StoreBlockedError(FetchError):
+    """The store refused automated access (403 or an "Access Denied" page) or rate-limited us.
+
+    We never try to get around this; the message tells the user what happened instead.
+    """
+
+    def __init__(self, host: str, status: int | None) -> None:
+        if status == 429:
+            message = f"{host} is limiting automated requests (429). Try again later."
+        else:
+            code = f" ({status})" if status else ""
+            message = (
+                f"{host} blocks automated price checks{code}. "
+                "This product can't be tracked automatically; check the price on the store's site."
+            )
+        super().__init__(message)
+        self.host, self.status = host, status
+
+
+def _check_blocked(host: str, status: int | None, html: str = "") -> None:
+    if status in (403, 429):
+        raise StoreBlockedError(host, status)
+    if "<title>Access Denied</title>" in html:  # block page served with a 200
+        raise StoreBlockedError(host, None)
+
+
 class Fetcher:
     def __init__(
         self,
@@ -66,6 +92,7 @@ class Fetcher:
             await self._wait_turn(host)
             try:
                 response = await self._client.get(url)
+                _check_blocked(host, response.status_code)
                 response.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 raise FetchError(f"Store answered {exc.response.status_code}.") from exc
@@ -90,12 +117,16 @@ class Fetcher:
                 browser = await pw.chromium.launch()
                 try:
                     page = await browser.new_page(user_agent=USER_AGENT, locale="tr-TR")
-                    await page.goto(url, wait_until="networkidle", timeout=self.timeout * 1000)
-                    return await page.content()
+                    response = await page.goto(
+                        url, wait_until="networkidle", timeout=self.timeout * 1000
+                    )
+                    html = await page.content()
                 except Exception as exc:  # Playwright raises its own error types
                     raise FetchError(f"Browser could not load the page: {exc}") from exc
                 finally:
                     await browser.close()
+        _check_blocked(host, response.status if response else None, html)
+        return html
 
     async def _wait_turn(self, host: str) -> None:
         delay = random.uniform(self.min_delay, self.max_delay)  # noqa: S311

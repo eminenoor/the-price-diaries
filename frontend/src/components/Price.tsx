@@ -24,3 +24,13 @@ export function Price({ value, size = "row", className = "" }: PriceProps) {
     </span>
   );
 }
+
+/** "Card price, regular 950,00" under a member price; nothing otherwise. */
+export function RegularPriceNote({ regular }: { regular: number | null }) {
+  if (regular === null) return null;
+  return (
+    <span className="regular-note">
+      Card price. Regular <Price value={regular} />
+    </span>
+  );
+}

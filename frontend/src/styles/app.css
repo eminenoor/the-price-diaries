@@ -91,6 +91,18 @@ code {
   font-size: 1.1em;
 }
 
+.regular-note,
+.log__regular {
+  color: var(--pumice);
+  font-size: var(--step--1);
+}
+
+.detail__price {
+  display: grid;
+  justify-items: end;
+  gap: var(--space-1);
+}
+
 /* ---------- Masthead ---------- */
 
 .masthead {

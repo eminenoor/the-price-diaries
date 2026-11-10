@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import type { Product } from "../api";
 import { AddProductForm } from "../components/AddProductForm";
-import { Price } from "../components/Price";
+import { Price, RegularPriceNote } from "../components/Price";
 import { Sparkline } from "../components/Sparkline";
 import { formatChange, insight, pickFeature } from "../format";
 import { useProducts, useStores } from "../hooks";
@@ -77,6 +77,7 @@ function Feature({ product }: { product: Product }) {
       </div>
       <div className="feature__figure">
         <Price value={s.current} size="hero" />
+        <RegularPriceNote regular={product.regular_price} />
         <Sparkline
           values={product.sparkline}
           width={320}
@@ -119,6 +120,7 @@ function ProductRow({ product }: { product: Product }) {
       <Sparkline values={product.sparkline} label={`Price trend for ${product.name}`} />
       <span className="row__price">
         {s ? <Price value={s.current} size="large" /> : <span className="row__pending">Not checked yet</span>}
+        <RegularPriceNote regular={product.regular_price} />
         {s?.change_pct ? (
           <span className={`row__change ${s.change_pct < 0 ? "is-down" : "is-up"}`}>
             {formatChange(s.change_pct)}

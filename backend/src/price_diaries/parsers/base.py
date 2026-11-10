@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, replace
 from typing import Any
 
 from bs4 import BeautifulSoup
@@ -17,6 +18,7 @@ class ParsedPrice:
     currency: str = "TRY"
     in_stock: bool = True
     source: str = "unknown"  # which strategy found it; handy when debugging
+    member_price: float | None = None  # loyalty-card price, e.g. Gratis Gold & Platinum
 
 
 class PriceNotFoundError(LookupError):
@@ -24,28 +26,49 @@ class PriceNotFoundError(LookupError):
 
 
 class Parser:
-    """Finds a price in HTML: custom selector, then JSON-LD, meta tags, store selectors."""
+    """Finds a price in HTML: custom selector, then JSON-LD, meta tags, store selectors.
 
-    def __init__(self, extra_selectors: tuple[str, ...] = ()) -> None:
+    ``member_labels`` are regular expressions for the text a store prints next to
+    its loyalty-card price (Gratis: "Gold&Platinum Özel Fiyat"). Matching on that
+    visible text instead of CSS classes keeps working when the store redesigns.
+    """
+
+    def __init__(
+        self, extra_selectors: tuple[str, ...] = (), member_labels: tuple[str, ...] = ()
+    ) -> None:
         self.extra_selectors = extra_selectors
+        self.member_labels = member_labels
 
     def parse(self, html: str, selector: str | None = None) -> ParsedPrice:
         soup = BeautifulSoup(html, "html.parser")
-
-        strategies = []
-        if selector:
-            strategies.append(lambda: _from_selectors(soup, (selector,), "custom-selector"))
-        strategies += [
-            lambda: _from_json_ld(soup),
-            lambda: _from_meta(soup),
-            lambda: _from_selectors(soup, self.extra_selectors, "site-selector"),
-        ]
-
-        for strategy in strategies:
+        for _, strategy in self._strategies(soup, selector):
             result = strategy()
             if result is not None:
+                member = _member_price(soup, self.member_labels)
+                if member is not None and member < result.price:
+                    result = replace(result, member_price=member)
                 return result
         raise PriceNotFoundError("No price found on page. Try adding a 'selector' for it.")
+
+    def explain(self, html: str, selector: str | None = None) -> dict[str, float | None]:
+        """What every strategy finds on the page. Used by `price-diaries inspect`."""
+        soup = BeautifulSoup(html, "html.parser")
+        found = {}
+        for name, strategy in self._strategies(soup, selector):
+            result = strategy()
+            found[name] = result.price if result else None
+        found["member price"] = _member_price(soup, self.member_labels)
+        return found
+
+    def _strategies(self, soup: BeautifulSoup, selector: str | None):
+        if selector:
+            yield "custom selector", lambda: _from_selectors(soup, (selector,), "custom-selector")
+        yield "json-ld", lambda: _from_json_ld(soup)
+        yield "meta tags", lambda: _from_meta(soup)
+        yield (
+            "store selectors",
+            lambda: _from_selectors(soup, self.extra_selectors, "site-selector"),
+        )
 
 
 # --- strategies -----------------------------------------------------------
@@ -116,6 +139,30 @@ def _from_selectors(
         price = parse_price(text)
         if price is not None:
             return ParsedPrice(price=price, currency=detect_currency(text), source=source)
+    return None
+
+
+def _member_price(soup: BeautifulSoup, labels: tuple[str, ...]) -> float | None:
+    """Find the price printed right after a loyalty-card label.
+
+    The label and the price are usually separate elements inside one box, so
+    we climb from the label towards its ancestors until the box's text has a
+    price after the label.
+    """
+    for label in labels:
+        pattern = re.compile(label, re.IGNORECASE)
+        for text_node in soup.find_all(string=pattern):
+            element = text_node.parent
+            for _ in range(4):
+                if element is None:
+                    break
+                text = element.get_text(" ", strip=True)
+                match = pattern.search(text)
+                if match:
+                    after = text[match.end() :]
+                    if re.search(r"\d", after):
+                        return parse_price(after)
+                element = element.parent
     return None
 
 

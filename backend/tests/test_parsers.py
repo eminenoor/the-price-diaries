@@ -63,6 +63,13 @@ def test_missing_price_raises():
             249.99,
         ),
         (
+            "www.trendyol.com",
+            '<div class="price-wrapper-container"><span>Son 14 Günün En Düşük Fiyatı!</span>'
+            '<div class="price-view"><span class="original">375 TL</span>'
+            '<span class="discounted">349 TL</span></div></div>',
+            349.0,
+        ),
+        (
             "www.amazon.com.tr",
             '<div id="corePriceDisplay_desktop_feature_div"><span class="a-price">'
             '<span class="a-offscreen">1.149,00 TL</span></span></div>',
@@ -95,3 +102,37 @@ def test_store_lookup(host, key):
 
 def test_unknown_store():
     assert store_for_host("evil.example") is None
+
+
+GRATIS_MEMBER_PAGE = """
+<script type="application/ld+json">
+{"@type": "Product", "offers": {"price": "950.00", "priceCurrency": "TRY"}}
+</script>
+<span class="badge">Gratis'e Özel</span>
+<div class="card-box">
+  <div class="title">Gold&amp;Platinum Özel Fiyat</div>
+  <div class="amount"><span>490,00</span> TL</div>
+</div>
+<div class="price">950,00 TL</div>
+"""
+
+
+def test_gratis_member_price():
+    result = store_for_host("www.gratis.com").parser().parse(GRATIS_MEMBER_PAGE)
+    assert (result.price, result.member_price) == (950.0, 490.0)
+
+
+def test_member_price_must_be_cheaper():
+    html = GRATIS_MEMBER_PAGE.replace("490,00", "990,00")
+    assert store_for_host("www.gratis.com").parser().parse(html).member_price is None
+
+
+def test_no_member_label_no_member_price():
+    assert store_for_host("www.gratis.com").parser().parse(JSON_LD_PAGE).member_price is None
+
+
+def test_explain_lists_every_strategy():
+    found = store_for_host("www.gratis.com").parser().explain(GRATIS_MEMBER_PAGE)
+    assert found["json-ld"] == 950.0
+    assert found["member price"] == 490.0
+    assert found["meta tags"] is None

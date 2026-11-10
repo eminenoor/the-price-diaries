@@ -48,12 +48,19 @@ class PricePoint(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
-    price: Mapped[float] = mapped_column(Float)
+    price: Mapped[float] = mapped_column(Float)  # regular shelf price
+    member_price: Mapped[float | None] = mapped_column(Float)  # loyalty-card price, if any
     currency: Mapped[str] = mapped_column(String(3), default="TRY")
     in_stock: Mapped[bool] = mapped_column(default=True)
     checked_at: Mapped[datetime] = mapped_column(default=datetime.now)
 
     product: Mapped[Product] = relationship(back_populates="prices")
+
+    def effective_price(self, use_member_prices: bool) -> float:
+        """The price you would actually pay."""
+        if use_member_prices and self.member_price is not None:
+            return self.member_price
+        return self.price
 
 
 def ensure_sqlite_dir(url: str) -> None:

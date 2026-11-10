@@ -29,12 +29,15 @@ export interface Product {
   last_error: string | null;
   created_at: string;
   summary: Summary | null;
+  /** Latest shelf price, set only when the main price shown is a member price. */
+  regular_price: number | null;
   sparkline: number[];
 }
 
 export interface PricePoint {
   checked_at: string;
   price: number;
+  member_price: number | null;
   currency: string;
   in_stock: boolean;
 }

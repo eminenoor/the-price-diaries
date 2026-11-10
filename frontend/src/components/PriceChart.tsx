@@ -17,7 +17,10 @@ export function PriceChart({ history, anomalies, target }: PriceChartProps) {
     const node = ref.current;
     if (!node || history.length < 2) return;
 
-    const data = history.map((p) => ({ date: new Date(p.checked_at), price: p.price }));
+    const data = history.map((p) => ({
+      date: new Date(p.checked_at),
+      price: p.member_price ?? p.price,
+    }));
     const flagged = anomalies.map((a) => ({ date: new Date(a.checked_at), price: a.price }));
     const low = data.reduce((a, b) => (b.price <= a.price ? b : a));
 

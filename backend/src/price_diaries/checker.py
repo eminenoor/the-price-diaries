@@ -40,11 +40,23 @@ async def fetch_price(product: Product, source: PageSource, browser_fallback: bo
 
     if not store.needs_browser:
         try:
-            return parser.parse(await source.get(product.url), selector=product.selector)
+            parsed = parser.parse(await source.get(product.url), selector=product.selector)
         except PriceNotFoundError:
             if not browser_fallback:
                 raise
             log.info("%s: no price in raw HTML, trying the browser", product.name)
+        else:
+            if parsed.member_price is not None or not store.member_labels or not browser_fallback:
+                return parsed
+            # Member prices are often added by JavaScript after the page loads.
+            try:
+                rendered = parser.parse(
+                    await source.get_rendered(product.url), selector=product.selector
+                )
+            except (FetchError, PriceNotFoundError) as exc:
+                log.info("%s: kept regular price, member price unavailable: %s", product.name, exc)
+                return parsed
+            return rendered if rendered.member_price is not None else parsed
 
     html = await source.get_rendered(product.url)
     return parser.parse(html, selector=product.selector)
@@ -65,6 +77,7 @@ async def check_product(
         PricePoint(
             product_id=product.id,
             price=parsed.price,
+            member_price=parsed.member_price,
             currency=parsed.currency,
             in_stock=parsed.in_stock,
             checked_at=datetime.now(),
@@ -73,7 +86,7 @@ async def check_product(
     product.last_error = None
     session.commit()
     log.info("%s: %.2f %s (%s)", product.name, parsed.price, parsed.currency, parsed.source)
-    return CheckOutcome(product.id, ok=True, price=parsed.price)
+    return CheckOutcome(product.id, ok=True, price=parsed.member_price or parsed.price)
 
 
 async def check_all(
@@ -101,12 +114,15 @@ async def check_all(
                 PricePoint(
                     product_id=product.id,
                     price=result.price,
+                    member_price=result.member_price,
                     currency=result.currency,
                     in_stock=result.in_stock,
                     checked_at=now,
                 )
             )
             product.last_error = None
-            outcomes.append(CheckOutcome(product.id, ok=True, price=result.price))
+            outcomes.append(
+                CheckOutcome(product.id, ok=True, price=result.member_price or result.price)
+            )
     session.commit()
     return outcomes

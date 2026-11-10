@@ -1,8 +1,9 @@
 import { lazy, Suspense, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { Price } from "../components/Price";
+import { Price, RegularPriceNote } from "../components/Price";
 import { formatChange, formatDate, insight } from "../format";
+import type { PricePoint } from "../api";
 import { useCheckOne, useProduct, useRemoveProduct, useSetTarget, useStores } from "../hooks";
 
 // Observable Plot is the largest dependency, so load it only on this page.
@@ -50,7 +51,12 @@ export function ProductPage() {
             {product.category ? `, ${product.category.toLowerCase()}` : ""}
           </p>
         </div>
-        {s && <Price value={s.current} size="hero" />}
+        {s && (
+          <div className="detail__price">
+            <Price value={s.current} size="hero" />
+            <RegularPriceNote regular={product.regular_price} />
+          </div>
+        )}
       </header>
 
       <p className={`detail__insight ${s?.fake_sale ? "is-warning" : ""}`}>{insight(product)}</p>
@@ -113,17 +119,23 @@ export function ProductPage() {
             </thead>
             <tbody>
               {[...product.history].reverse().map((p, i, all) => {
-                const before = all[i + 1]?.price;
-                const change = before ? ((p.price - before) / before) * 100 : 0;
+                const paid = (point: PricePoint) => point.member_price ?? point.price;
+                const before = all[i + 1] ? paid(all[i + 1]) : undefined;
+                const change = before ? ((paid(p) - before) / before) * 100 : 0;
                 return (
                   <tr key={p.checked_at}>
                     <td>{formatDate(p.checked_at)}</td>
                     <td className="log__price">
-                      <Price value={p.price} />
+                      <Price value={p.member_price ?? p.price} />
                     </td>
                     <td className="log__note">
                       {Math.abs(change) >= 0.05 && (
                         <span className={change < 0 ? "is-down" : "is-up"}>{formatChange(change)}</span>
+                      )}
+                      {p.member_price !== null && (
+                        <span className="log__regular">
+                          Regular <Price value={p.price} />
+                        </span>
                       )}
                       {unusual.has(p.checked_at) && <span className="tag">Unusual rise</span>}
                       {!p.in_stock && <span className="tag">Out of stock</span>}

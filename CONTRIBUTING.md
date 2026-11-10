@@ -59,10 +59,13 @@ Rules of thumb:
 
 ## Adding a store
 
+Start by running `uv run price-diaries inspect <product url>` (add `--browser` and `--save page.html` when needed). It shows which strategies already find the price, so you only add what's missing.
+
 1. Add a `Store(...)` entry in `backend/src/price_diaries/parsers/sites.py` with its domains and price selectors. To find a selector, open a product page, right-click the price, choose **Inspect**, and note a stable class name.
 2. Set `needs_browser=True` if the price only appears after JavaScript runs. A quick test: view the page source (Ctrl+U) and search for the price.
-3. Add a case to `test_store_selectors` and `test_store_lookup` in `backend/tests/test_parsers.py`.
-4. Commit as `feat(parsers): add <store> store`.
+3. If the store shows a loyalty-card price, add the label text next to it to `member_labels`.
+4. Add a case to `test_store_selectors` and `test_store_lookup` in `backend/tests/test_parsers.py`.
+5. Commit as `feat(parsers): add <store> store`.
 
 ## Database changes
 

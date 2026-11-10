@@ -106,9 +106,16 @@ def _get_product(session: Session, product_id: int) -> Product:
 # --- serialization -------------------------------------------------------------
 
 
-def _to_out(product: Product) -> ProductOut:
-    history = [(p.checked_at, p.price) for p in product.prices]
+def _history(product: Product, use_member: bool) -> list[tuple]:
+    """Price history using the price you would actually pay."""
+    return [(p.checked_at, p.effective_price(use_member)) for p in product.prices]
+
+
+def _to_out(product: Product, use_member: bool) -> ProductOut:
+    history = _history(product, use_member)
     summary = summarize(history)
+    latest = product.prices[-1] if product.prices else None
+    shows_member = bool(latest and use_member and latest.member_price is not None)
     return ProductOut(
         id=product.id,
         url=product.url,
@@ -119,14 +126,15 @@ def _to_out(product: Product) -> ProductOut:
         last_error=product.last_error,
         created_at=product.created_at,
         summary=Summary(**vars(summary)) if summary else None,
+        regular_price=latest.price if shows_member else None,
         sparkline=[price for _, price in history[-30:]],
     )
 
 
-def _to_detail(product: Product) -> ProductDetail:
-    history = [(p.checked_at, p.price) for p in product.prices]
+def _to_detail(product: Product, use_member: bool) -> ProductDetail:
+    history = _history(product, use_member)
     return ProductDetail(
-        **_to_out(product).model_dump(),
+        **_to_out(product, use_member).model_dump(),
         history=[PricePointOut.model_validate(p, from_attributes=True) for p in product.prices],
         anomalies=[AnomalyOut(**vars(a)) for a in price_anomalies(history)],
     )
@@ -145,12 +153,14 @@ def _register_routes(app: FastAPI) -> None:
         return [StoreOut(key=s.key, name=s.name, domains=list(s.domains)) for s in STORES]
 
     @app.get("/api/products")
-    def list_products(session: SessionDep) -> list[ProductOut]:
+    def list_products(session: SessionDep, settings: SettingsDep) -> list[ProductOut]:
         products = session.scalars(select(Product).order_by(Product.name)).all()
-        return [_to_out(p) for p in products]
+        return [_to_out(p, settings.use_member_prices) for p in products]
 
     @app.post("/api/products", status_code=status.HTTP_201_CREATED)
-    def create_product(body: ProductCreate, session: SessionDep) -> ProductOut:
+    def create_product(
+        body: ProductCreate, session: SessionDep, settings: SettingsDep
+    ) -> ProductOut:
         try:
             url, store = validate_product_url(body.url)
         except UnsupportedURLError as exc:
@@ -171,19 +181,21 @@ def _register_routes(app: FastAPI) -> None:
             session.rollback()
             raise HTTPException(status.HTTP_409_CONFLICT, "This link is already tracked.") from exc
         session.refresh(product)
-        return _to_out(product)
+        return _to_out(product, settings.use_member_prices)
 
     @app.get("/api/products/{product_id}")
-    def get_product(product_id: int, session: SessionDep) -> ProductDetail:
-        return _to_detail(_get_product(session, product_id))
+    def get_product(product_id: int, session: SessionDep, settings: SettingsDep) -> ProductDetail:
+        return _to_detail(_get_product(session, product_id), settings.use_member_prices)
 
     @app.patch("/api/products/{product_id}")
-    def update_product(product_id: int, body: ProductUpdate, session: SessionDep) -> ProductOut:
+    def update_product(
+        product_id: int, body: ProductUpdate, session: SessionDep, settings: SettingsDep
+    ) -> ProductOut:
         product = _get_product(session, product_id)
         for field, value in body.model_dump(exclude_unset=True).items():
             setattr(product, field, value)
         session.commit()
-        return _to_out(product)
+        return _to_out(product, settings.use_member_prices)
 
     @app.delete("/api/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
     def delete_product(product_id: int, session: SessionDep) -> None:

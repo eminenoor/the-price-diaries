@@ -51,12 +51,16 @@ class ProductOut(BaseModel):
     last_error: str | None
     created_at: datetime
     summary: Summary | None
+    regular_price: float | None = Field(
+        default=None, description="Latest shelf price, when a member price is shown instead."
+    )
     sparkline: list[float] = Field(description="Up to the last 30 prices, oldest first.")
 
 
 class PricePointOut(BaseModel):
     checked_at: datetime
     price: float
+    member_price: float | None
     currency: str
     in_stock: bool
 

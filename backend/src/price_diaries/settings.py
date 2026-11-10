@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     request_timeout: float = 20.0
     # Use a headless browser when a page has no price in its HTML.
     browser_fallback: bool = True
+    # You have the store's loyalty card (e.g. Gratis Gold/Platinum): track that price.
+    use_member_prices: bool = True
     # Built frontend (npm run build). Served at / when it exists.
     frontend_dir: str | None = "../frontend/dist"
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]

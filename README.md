@@ -20,6 +20,7 @@ Beauty retailers change prices almost daily. A common pattern is to raise a pric
 - **Daily automatic checks** for Gratis, Trendyol, Amazon, Watsons, Rossmann, Eve Shop and Sephora, plus a "check now" button.
 - **Fake-sale detection.** Flags a discount that only undoes a recent price rise.
 - **Unusual-rise detection** with a robust statistical method (see below), tuned per product.
+- **Loyalty-card prices.** When a store shows a member price (such as Gratis Gold & Platinum), that's the price tracked, with the regular price shown beside it.
 - **Target prices.** Set the price you're willing to pay and see when it's reached.
 - **Full history** for every product: lowest, highest, 30-day low, and a chart of every check.
 - **Local-first and private.** Everything runs and stays on your own computer.
@@ -44,7 +45,7 @@ flowchart LR
 ```
 
 1. **Fetching.** Pages are downloaded with async `httpx`. Different stores are fetched in parallel, but pages from the same store are fetched one at a time with a random 3–7 second pause, and `robots.txt` is respected. If a store renders its price with JavaScript, the page is opened in headless Chromium via Playwright.
-2. **Parsing.** Each store tries, in order: a custom CSS selector you set, [schema.org JSON-LD](https://schema.org/Offer) product data, Open Graph / microdata meta tags, then store-specific selectors. Prices in Turkish format (`1.299,90 TL`) and English format (`1,299.90`) are both handled.
+2. **Parsing.** Each store tries, in order: a custom CSS selector you set, [schema.org JSON-LD](https://schema.org/Offer) product data, Open Graph / microdata meta tags, then store-specific selectors. Prices in Turkish format (`1.299,90 TL`) and English format (`1,299.90`) are both handled. Loyalty-card prices are found by their visible label (for example "Özel Fiyat") rather than by CSS classes, so they survive store redesigns.
 3. **Analysis.** Each check is stored, and the dashboard reads summaries computed from the full history.
 
 ### Detecting fake discounts
@@ -100,6 +101,16 @@ uv sync --extra browser
 uv run playwright install chromium
 ```
 
+### Stores that block automated checks
+
+Some stores refuse automated visits. When that happens, the product shows "Last check failed" with the reason, for example "www.sephora.com.tr blocks automated price checks", instead of a price. The Price Diaries doesn't try to get around these blocks.
+
+As of November 2026:
+
+- **Sephora** blocks automated checks, both for plain page downloads and in the browser. Prices can't be tracked automatically.
+- **Watsons** blocks the browser, but plain page downloads work, so regular prices are tracked.
+- **Eve Shop** answered "too many requests" (429) during testing. If you see this, try again later.
+
 ### Daily use (one command)
 
 Build the frontend once, and the backend serves it together with the API:
@@ -114,7 +125,7 @@ While the server runs, prices are checked every day at 09:17. If your computer w
 
 ### Configuration
 
-Copy `backend/.env.example` to `backend/.env` to change the check time, delays, or database location.
+Copy `backend/.env.example` to `backend/.env` to change the check time, delays, or database location. If you don't have a store's loyalty card, set `PD_USE_MEMBER_PRICES=false` to track regular prices instead.
 
 ## Commands
 
@@ -124,6 +135,7 @@ Copy `backend/.env.example` to `backend/.env` to change the check time, delays, 
 | `uv run price-diaries check` | Checks every product once, now |
 | `uv run price-diaries migrate` | Creates or updates the database |
 | `uv run price-diaries demo` | Adds demo products with fake history |
+| `uv run price-diaries inspect <url>` | Shows what every parsing strategy finds on a product page (add `--browser` to render JavaScript, `--save page.html` to keep the HTML) |
 | `uv run pytest` | Backend tests |
 | `npm test` | Frontend tests |
 
