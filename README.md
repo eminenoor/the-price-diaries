@@ -2,7 +2,7 @@
 
 **A personal price diary for skincare and beauty products.** The Price Diaries checks the products you care about every morning across seven Turkish online stores, remembers every price, and tells you when a "sale" is really just a price that was raised a few days earlier.
 
-[![CI](https://github.com/<your-username>/price-diaries/actions/workflows/ci.yml/badge.svg)](https://github.com/<your-username>/price-diaries/actions/workflows/ci.yml)
+[![CI](https://github.com/eminenoor/the-price-diaries/actions/workflows/ci.yml/badge.svg)](https://github.com/eminenoor/the-price-diaries/actions/workflows/ci.yml)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-2b1f2a)
 ![TypeScript](https://img.shields.io/badge/typescript-strict-2b1f2a)
 ![License: MIT](https://img.shields.io/badge/license-MIT-2b1f2a)
@@ -78,8 +78,8 @@ where $\tilde{r}$ is the median return and MAD is the median absolute deviation.
 You need [uv](https://docs.astral.sh/uv/getting-started/installation/) and [Node.js 22+](https://nodejs.org/).
 
 ```bash
-git clone https://github.com/<your-username>/price-diaries.git
-cd price-diaries
+git clone https://github.com/eminenoor/the-price-diaries.git
+cd the-price-diaries
 
 # Backend
 cd backend
