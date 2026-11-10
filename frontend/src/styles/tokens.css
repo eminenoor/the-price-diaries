@@ -1,0 +1,61 @@
+/*
+  The Price Diaries design tokens.
+
+  Concept: a beauty-counter price diary. Cool porcelain (pharmacy tile,
+  not warm cream), aubergine ink, lipstick rouge for warnings and a deep
+  leaf green for good news. Prices are set in a Didone like a magazine
+  cover; everything else is a quiet geometric sans.
+*/
+
+:root {
+  /* Color */
+  --porcelain: #eef0ec; /* page */
+  --paper: #f8f9f6; /* raised surfaces, inputs */
+  --ink: #2b1f2a; /* aubergine: text and lines */
+  --pumice: #6b6566; /* secondary text */
+  --mist: #c9ccc4; /* rules and borders */
+  --chlorophyll: #2f6a4a; /* price went down, good deal */
+  --rouge: #a3354b; /* price went up, fake sale */
+  --rouge-wash: #f3e3e6;
+  --leaf-wash: #e0ece4;
+
+  /* Type */
+  --font-display: "Bodoni Moda Variable", "Didot", "Bodoni 72", serif;
+  --font-text: "Jost Variable", "Futura", "Century Gothic", sans-serif;
+
+  /* Modular scale, ratio 1.333 (perfect fourth), base 17px */
+  --step--1: 0.8125rem;
+  --step-0: 1.0625rem;
+  --step-1: 1.4125rem;
+  --step-2: 1.8875rem;
+  --step-3: 2.5125rem;
+  --step-4: 3.35rem;
+  --step-6: clamp(3.75rem, 9vw + 1rem, 7.5rem); /* hero price */
+
+  /* Space */
+  --space-1: 0.375rem;
+  --space-2: 0.75rem;
+  --space-3: 1.25rem;
+  --space-4: 2rem;
+  --space-5: 3.25rem;
+  --space-6: 5.25rem;
+
+  --measure: 66ch;
+  --page-width: 72rem;
+  --gutter: clamp(1rem, 4vw, 3rem);
+  --radius-control: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --porcelain: #1d1a1e;
+    --paper: #262228;
+    --ink: #ece6e4;
+    --pumice: #a8a0a2;
+    --mist: #4a4448;
+    --chlorophyll: #7fbf98;
+    --rouge: #ec8a9c;
+    --rouge-wash: #3d2229;
+    --leaf-wash: #1f3328;
+  }
+}

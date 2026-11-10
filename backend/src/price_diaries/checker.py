@@ -1,0 +1,112 @@
+"""Fetch the current price of products and store it."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Protocol
+from urllib.parse import urlsplit
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from price_diaries.db import PricePoint, Product
+from price_diaries.fetcher import FetchError
+from price_diaries.parsers import ParsedPrice, PriceNotFoundError, store_for_host
+
+log = logging.getLogger(__name__)
+
+
+class PageSource(Protocol):
+    async def get(self, url: str) -> str: ...
+    async def get_rendered(self, url: str) -> str: ...
+
+
+@dataclass(frozen=True)
+class CheckOutcome:
+    product_id: int
+    ok: bool
+    price: float | None = None
+    error: str | None = None
+
+
+async def fetch_price(product: Product, source: PageSource, browser_fallback: bool) -> ParsedPrice:
+    store = store_for_host(urlsplit(product.url).hostname or "")
+    if store is None:
+        raise PriceNotFoundError("Store is no longer supported.")
+    parser = store.parser()
+
+    if not store.needs_browser:
+        try:
+            return parser.parse(await source.get(product.url), selector=product.selector)
+        except PriceNotFoundError:
+            if not browser_fallback:
+                raise
+            log.info("%s: no price in raw HTML, trying the browser", product.name)
+
+    html = await source.get_rendered(product.url)
+    return parser.parse(html, selector=product.selector)
+
+
+async def check_product(
+    session: Session, product: Product, source: PageSource, browser_fallback: bool = True
+) -> CheckOutcome:
+    try:
+        parsed = await fetch_price(product, source, browser_fallback)
+    except (FetchError, PriceNotFoundError) as exc:
+        product.last_error = str(exc)[:500]
+        session.commit()
+        log.warning("%s: %s", product.name, exc)
+        return CheckOutcome(product.id, ok=False, error=product.last_error)
+
+    session.add(
+        PricePoint(
+            product_id=product.id,
+            price=parsed.price,
+            currency=parsed.currency,
+            in_stock=parsed.in_stock,
+            checked_at=datetime.now(),
+        )
+    )
+    product.last_error = None
+    session.commit()
+    log.info("%s: %.2f %s (%s)", product.name, parsed.price, parsed.currency, parsed.source)
+    return CheckOutcome(product.id, ok=True, price=parsed.price)
+
+
+async def check_all(
+    session: Session, source: PageSource, browser_fallback: bool = True
+) -> list[CheckOutcome]:
+    """Check every product. Stores run in parallel; one store is checked one page at a time
+    (the fetcher enforces that), so we never hammer a single site."""
+    products = session.scalars(select(Product)).all()
+    # Fetching is concurrent, but SQLite writes go through one session, so we
+    # gather the network part and write results sequentially.
+    prices = await asyncio.gather(
+        *(fetch_price(p, source, browser_fallback) for p in products), return_exceptions=True
+    )
+
+    outcomes = []
+    now = datetime.now()
+    for product, result in zip(products, prices, strict=True):
+        if isinstance(result, (FetchError, PriceNotFoundError)):
+            product.last_error = str(result)[:500]
+            outcomes.append(CheckOutcome(product.id, ok=False, error=product.last_error))
+        elif isinstance(result, BaseException):
+            raise result
+        else:
+            session.add(
+                PricePoint(
+                    product_id=product.id,
+                    price=result.price,
+                    currency=result.currency,
+                    in_stock=result.in_stock,
+                    checked_at=now,
+                )
+            )
+            product.last_error = None
+            outcomes.append(CheckOutcome(product.id, ok=True, price=result.price))
+    session.commit()
+    return outcomes
