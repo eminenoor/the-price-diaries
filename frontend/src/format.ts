@@ -16,16 +16,32 @@ export function formatDate(iso: string): string {
   return shortDate.format(new Date(iso));
 }
 
+const clock = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+/** 09:17 */
+export function formatTime(date: Date): string {
+  return clock.format(date);
+}
+
+/** One check, as the chart tooltip shows it: "10 Nov, 09:17 · ₺268,22". */
+export function formatCheck(date: Date, price: number): string {
+  return `${shortDate.format(date)}, ${formatTime(date)} · ₺${formatPrice(price)}`;
+}
+
 export function formatChange(pct: number): string {
   const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
   return `${sign}${Math.abs(pct).toFixed(1)}%`;
+}
+
+function isToday(iso: string, now: Date): boolean {
+  return new Date(iso).toDateString() === now.toDateString();
 }
 
 /**
  * One plain sentence about what matters most right now.
  * Ordered by how useful it is to someone deciding whether to buy.
  */
-export function insight(product: Product): string {
+export function insight(product: Product, now: Date = new Date()): string {
   const s: Summary | null = product.summary;
   if (product.last_error) return `Last check failed: ${product.last_error}`;
   if (!s) return "Waiting for the first price check.";
@@ -34,7 +50,11 @@ export function insight(product: Product): string {
     return "This discount follows a recent price rise, so it isn't really cheaper than before.";
   if (product.target_price !== null && s.current <= product.target_price)
     return `Below your alert price of ${formatPrice(product.target_price)}. A good time to buy.`;
-  if (s.is_all_time_low && s.previous !== null) return "The lowest price since you started tracking.";
+  if (s.previous === null)
+    return isToday(s.lowest_at, now)
+      ? "First check today. Come back tomorrow to see if it moves."
+      : `First check on ${formatDate(s.lowest_at)}. The next check shows if it moves.`;
+  if (s.is_all_time_low && s.current < s.highest) return "The lowest price since you started tracking.";
   if (s.current <= s.lowest_30d) return "The lowest price in the last 30 days.";
   if (s.change_pct !== null && s.change_pct > 0)
     return `Up ${formatChange(s.change_pct).slice(1)} since the last check. Lowest was ${formatPrice(s.lowest)} on ${formatDate(s.lowest_at)}.`;

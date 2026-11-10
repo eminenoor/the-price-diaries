@@ -33,6 +33,9 @@ export const useAddProduct = () => useInvalidating((body: NewProduct) => api.cre
 export const useCheckAll = () => useInvalidating(() => api.checkAll());
 export const useCheckOne = () => useInvalidating((id: number) => api.check(id));
 export const useRemoveProduct = () => useInvalidating((id: number) => api.remove(id));
+/** brand "" removes the brand. */
+export const useSetBrand = () =>
+  useInvalidating(({ id, brand }: { id: number; brand: string }) => api.update(id, { brand }));
 export const useSetTarget = () =>
   useInvalidating(({ id, target }: { id: number; target: number }) =>
     api.update(id, { target_price: target }),

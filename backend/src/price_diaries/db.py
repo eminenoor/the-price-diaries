@@ -48,6 +48,8 @@ class Product(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     url: Mapped[str] = mapped_column(String(2048), unique=True)
     name: Mapped[str] = mapped_column(String(200))
+    # From the store page; the user can correct it. "" means "no brand, don't fill it in".
+    brand: Mapped[str | None] = mapped_column(String(100))
     store: Mapped[str] = mapped_column(String(32), index=True)
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), index=True

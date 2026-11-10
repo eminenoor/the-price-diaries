@@ -92,6 +92,8 @@ async def check_product(
     product.last_error = None
     product.blocked = False
     product.image_url = parsed.image_url or product.image_url
+    if product.brand is None:  # never overwrite a brand the user set or removed
+        product.brand = parsed.brand
     session.commit()
     log.info("%s: %.2f %s (%s)", product.name, parsed.price, parsed.currency, parsed.source)
     return CheckOutcome(product.id, ok=True, price=parsed.member_price or parsed.price)
@@ -132,6 +134,8 @@ async def check_all(
             product.last_error = None
             product.blocked = False
             product.image_url = result.image_url or product.image_url
+            if product.brand is None:
+                product.brand = result.brand
             outcomes.append(
                 CheckOutcome(product.id, ok=True, price=result.member_price or result.price)
             )

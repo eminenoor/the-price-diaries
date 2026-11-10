@@ -23,6 +23,7 @@ const base = {
   created_at: "2026-09-01T09:00:00",
   regular_price: null,
   sparkline: [],
+  brand: null,
 };
 const summary = {
   current: 300,
@@ -87,7 +88,10 @@ export function renderIndex(products: Product[], route = "/") {
   );
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  localStorage.clear();
+});
 
 describe("IndexPage states", () => {
   it("shows a dark building when nothing is tracked", async () => {
@@ -109,5 +113,35 @@ describe("IndexPage states", () => {
     expect(within(skincare).getAllByRole("listitem")).toHaveLength(3);
     const pantry = screen.getByRole("region", { name: "pantry" });
     expect(pantry).toHaveTextContent("No lights on this floor yet.");
+  });
+
+  it("says an empty floor is empty once, and subtitles the whole building", async () => {
+    renderIndex(PRODUCTS.filter((p) => p.category_id !== 2), "/?floor=2");
+    expect(await screen.findByText("No lights on this floor yet.")).toBeInTheDocument();
+    expect(screen.queryByText(/^No lights on yet/)).not.toBeInTheDocument();
+    expect(document.querySelector(".subtitle")).toHaveTextContent(
+      "Zinc toner is at its lowest ever at Gratis.",
+    );
+  });
+
+  it("titles quiet mode with the full name", async () => {
+    localStorage.setItem("price-diaries:mode", "quiet");
+    renderIndex(PRODUCTS);
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("the price diaries");
+  });
+
+  it("titles the empty quiet poster with the full name too", async () => {
+    localStorage.setItem("price-diaries:mode", "quiet");
+    renderIndex([]);
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("the price diaries");
+  });
+
+  it("does the same in quiet mode", async () => {
+    localStorage.setItem("price-diaries:mode", "quiet");
+    renderIndex(PRODUCTS.filter((p) => p.category_id !== 2), "/?floor=2");
+    expect(await screen.findByText("Nothing tracked on this floor yet.")).toBeInTheDocument();
+    expect(document.querySelector(".poster-summary")).toHaveTextContent(
+      "Zinc toner is at its lowest ever at Gratis.",
+    );
   });
 });

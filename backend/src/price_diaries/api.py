@@ -155,6 +155,7 @@ def _to_out(product: Product, use_member: bool) -> ProductOut:
         id=product.id,
         url=product.url,
         name=product.name,
+        brand=product.brand or None,  # "" (removed by the user) is no brand too
         store=product.store,
         category_id=product.category_id,
         target_price=product.target_price,
@@ -274,6 +275,9 @@ def _register_routes(app: FastAPI) -> None:
         product = _get_product(session, product_id)
         changes = body.model_dump(exclude_unset=True)
         _require_category(session, changes.get("category_id"))
+        if "brand" in changes:
+            # A blank brand is kept as "", so the next check doesn't fill it in again.
+            changes["brand"] = " ".join((changes["brand"] or "").split())
         for field, value in changes.items():
             setattr(product, field, value)
         session.commit()

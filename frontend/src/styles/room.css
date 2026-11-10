@@ -2,11 +2,13 @@
 
 .room {
   --chart-ink: var(--ink);
+  --chart-paper: var(--paper);
   --chart-warn: var(--rouge);
 }
 
 :root[data-mode="quiet"] .room {
   --chart-ink: var(--text);
+  --chart-paper: var(--bg);
   --chart-warn: var(--pencil);
 }
 
@@ -40,33 +42,13 @@
   transform: rotate(-1.5deg);
 }
 
-/* Inside the room the curtains are open and the lamp is on. */
-.room .curtain {
-  --curtain: 13%;
-}
-
-.room .window__glass {
-  background: radial-gradient(
-    circle at 50% 30%,
-    var(--lamp-hot) 0,
-    var(--lamp) 32%,
-    var(--lamp-deep) 95%
-  );
-}
-
-.room .window--big {
+/* Same light and curtains as the window outside (lighting() in scene.ts),
+   only bigger, with a wider glow when it's lit. */
+.window--big.window--lamp {
   box-shadow: 0 0 80px 8px var(--lamp-glow);
 }
 
-.room .silhouette {
-  fill: var(--silhouette);
-}
-
-.room--fake .window__glass {
-  background: radial-gradient(circle at 50% 30%, var(--rose) 0, var(--rose-deep) 95%);
-}
-
-.room--fake .window--big {
+.window--big.window--rose {
   box-shadow: 0 0 80px 8px var(--rose-glow);
 }
 
@@ -165,100 +147,53 @@
   font-weight: 700;
 }
 
-.room__stop {
+/* Quiet housekeeping at the bottom: change the brand, stop tracking. */
+.room__edit {
+  position: relative; /* above any decoration */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2) var(--space-4);
   margin-top: var(--space-5);
-  text-align: center;
 }
 
-/* ---------- Facts: small paper strips ---------- */
+.edit-row__item {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.25em 0.75em;
+}
 
-.facts {
+.edit-form {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-3);
-  margin: var(--space-5) 0 var(--space-4);
-}
-
-.fact {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  min-width: 10rem;
-  padding: 0.6em 1em;
-  background: var(--paper);
-  color: var(--ink);
+  justify-content: center;
+  gap: var(--space-2);
 }
 
-.fact:nth-child(odd) {
-  transform: rotate(-1deg);
-}
-
-.fact:nth-child(even) {
-  transform: rotate(1.2deg);
-}
-
-.fact dt {
+.edit-form label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5em;
   font-weight: 700;
-  font-size: var(--step--1);
 }
 
-.fact dd {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  margin: 0;
-}
-
-.fact__note,
-.fact__none {
-  font-size: var(--step--1);
-}
-
-.fact .text-button {
-  color: var(--ink);
-  font-size: var(--step--1);
-}
-
-.alert-form {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.4rem;
-}
-
-.alert-form input {
-  width: 7rem;
-  padding: 0.3em 0.4em;
+.edit-form input {
+  width: 12rem;
+  padding: 0.3em 0.2em;
   border: 0;
-  border-bottom: 2px solid var(--ink);
+  border-bottom: 2px solid var(--text);
   background: transparent;
-  color: var(--ink);
+  color: var(--text);
 }
 
-.fact__error {
-  font-size: var(--step--1);
+.edit-form__error {
+  flex-basis: 100%;
+  text-align: center;
   font-weight: 700;
-  color: var(--rouge);
-}
-
-:root[data-mode="quiet"] .fact {
-  background: transparent;
-  color: var(--text);
-  transform: none;
-  border: 2px solid var(--rule);
-}
-
-:root[data-mode="quiet"] .fact .text-button,
-:root[data-mode="quiet"] .alert-form input {
-  color: var(--text);
-  border-color: var(--rule);
-}
-
-:root[data-mode="quiet"] .fact__error {
-  color: var(--pencil);
 }
 
 /* ---------- The chart, on a torn paper strip ---------- */
@@ -290,6 +225,27 @@
   margin: 0;
 }
 
+/* Only one check so far: a handwritten note instead of a one-dot chart. */
+.chart-note {
+  width: fit-content;
+  max-width: 100%;
+  margin: var(--space-5) auto;
+  padding: 0.3em 0.9em 0.35em;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-hand);
+  font-size: 2rem;
+  line-height: 1.1;
+  text-align: center;
+  transform: rotate(-1.5deg);
+}
+
+:root[data-mode="quiet"] .chart-note {
+  background: transparent;
+  color: var(--text);
+  transform: none;
+}
+
 .chart__canvas {
   min-height: 260px;
 }
@@ -297,6 +253,21 @@
 .chart__canvas svg {
   max-width: 100%;
   overflow: visible;
+}
+
+/* The pencil notes, when they can't fit on the chart without covering it. */
+.chart__notes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.1em 1.4em;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--chart-ink);
+  font-family: var(--font-hand);
+  font-size: 1.5rem;
+  line-height: 1.2;
 }
 
 .chart__legend {
@@ -311,19 +282,28 @@
 
 /* ---------- Liner notes on a record sleeve ---------- */
 
+/* The record sits behind the sleeve and peeks out on the right. The sleeve is
+   always at least as tall as the record, so even with one track the record
+   stays tucked behind it, inside its own section, and can't cover a button,
+   link or the footer. */
 .sleeve {
+  --vinyl-size: clamp(7rem, 26vw, 17rem);
+  --vinyl-top: var(--space-4);
   position: relative;
+  isolation: isolate;
   max-width: 60rem;
   margin: var(--space-5) auto 0;
-  padding-right: clamp(3rem, 20vw, 15rem); /* room for the record to peek out */
+  padding-right: calc(var(--vinyl-size) * 0.45); /* room for the record to peek out */
 }
 
 .sleeve__vinyl {
   position: absolute;
-  top: var(--space-4);
+  z-index: -1;
+  top: var(--vinyl-top);
   right: 0;
-  width: min(28rem, 75%);
+  width: var(--vinyl-size);
   aspect-ratio: 1;
+  pointer-events: none;
   border-radius: 50%;
   border: 3px solid var(--groove);
   background:
@@ -333,6 +313,7 @@
 
 .sleeve__cover {
   position: relative;
+  min-height: calc(var(--vinyl-top) * 2 + var(--vinyl-size));
   padding: var(--space-4) var(--space-4) var(--space-4);
   background: var(--paper);
   color: var(--ink);
@@ -345,6 +326,11 @@
 
 .sleeve__sub {
   margin: var(--space-1) 0 var(--space-2);
+}
+
+.sleeve__card {
+  margin: calc(-1 * var(--space-1)) 0 var(--space-2);
+  font-weight: 700;
 }
 
 .sleeve .text-button {
@@ -389,6 +375,7 @@
 
 @media (max-width: 640px) {
   .sleeve {
+    --vinyl-size: 6rem;
     padding-right: 2.25rem;
   }
   .sleeve__cover {
@@ -411,6 +398,7 @@
 }
 
 :root[data-mode="quiet"] .sleeve__cover {
+  min-height: 0;
   background: transparent;
   color: var(--text);
   transform: none;

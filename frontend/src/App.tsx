@@ -1,5 +1,6 @@
 import { Link, Route, Routes, useLocation } from "react-router-dom";
 
+import { SvgFilters } from "./components/SvgFilters";
 import { useCheckAll, useProducts } from "./hooks";
 import { useMode } from "./mode";
 import { AddPage } from "./pages/AddPage";
@@ -9,6 +10,7 @@ import { ProductPage } from "./pages/ProductPage";
 export function App() {
   return (
     <div className="page">
+      <SvgFilters />
       <TopBar />
       <main id="main">
         <Routes>

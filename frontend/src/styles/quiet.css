@@ -2,11 +2,24 @@
 /* No rotation, no curtains, no glow. Black ink, 2px rules, red grease pencil. */
 
 .poster-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   margin: var(--space-3) 0 var(--space-3);
   text-align: center;
   font-size: clamp(3.4rem, 15vw, 11rem);
   letter-spacing: -0.065em;
   line-height: 0.8;
+}
+
+/* A small "the" above the big words, like the night masthead. */
+.poster-title__the {
+  margin-bottom: 0.1em;
+  font-family: var(--font-text);
+  font-weight: 500;
+  font-style: italic;
+  font-size: max(0.16em, var(--step-1));
+  letter-spacing: 0;
 }
 
 .poster-summary {
@@ -16,6 +29,7 @@
   font-weight: 700;
   font-size: var(--step-1);
   line-height: 1.3;
+  text-wrap: balance;
 }
 
 /* Floor tabs, quiet: plain outlined words. */
@@ -196,6 +210,7 @@
 
 /* Nothing new: faded, but still readable. */
 .poster-item--steady,
+.poster-item--first,
 .poster-item--up,
 .poster-item--waiting,
 .poster-item--error,
@@ -204,6 +219,7 @@
 }
 
 .poster-item--steady .poster-item__image,
+.poster-item--first .poster-item__image,
 .poster-item--up .poster-item__image,
 .poster-item--waiting .poster-item__image,
 .poster-item--error .poster-item__image,

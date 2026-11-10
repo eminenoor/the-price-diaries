@@ -3,7 +3,8 @@
 For developing the UI and taking README screenshots, so real scraped data
 never needs to be published. Every floor and every state the UI can show
 (good deal, fake sale, no change, price up, blocked store, member price,
-not checked yet) appears at least once, and the result is the same every run.
+one check only, two days of checks, not checked yet, empty floor, with and without a brand)
+appears at least once, and the result is the same every run.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from sqlalchemy.orm import Session
 from price_diaries.db import Category, PricePoint, Product
 from price_diaries.fetcher import StoreBlockedError
 
-Ending = Literal["deal", "fake", "steady", "up", "blocked", "waiting"]
+Ending = Literal["deal", "fake", "steady", "up", "blocked", "first", "two_days", "waiting"]
 
 
 @dataclass(frozen=True)
@@ -31,19 +32,61 @@ class DemoProduct:
     base: float
     ending: Ending
     member_share: float | None = None  # loyalty-card price as a share of the shelf price
+    brand: str | None = None
 
 
 DEMO_PRODUCTS = [
-    DemoProduct("AHA BHA PHA Toner 150 ml", "gratis", "Skincare", "Toners", 950, "deal", 0.52),
+    DemoProduct(
+        "AHA BHA PHA 30 Days Miracle Toner 150 ml",
+        "gratis",
+        "Skincare",
+        "Toners",
+        950,
+        "deal",
+        0.52,
+        brand="Some By Mi",
+    ),
     DemoProduct("Niacinamide 10% Toner 200 ml", "trendyol", "Skincare", "Toners", 210, "steady"),
     DemoProduct(
-        "Vitamin C 15% Serum 30 ml", "eveshop", "Skincare", "Vitamin C serums", 399, "deal"
+        "Vitamin C 15% Serum 30 ml",
+        "eveshop",
+        "Skincare",
+        "Vitamin C serums",
+        399,
+        "deal",
+        brand="Lumen Lab",
     ),
-    DemoProduct("SPF 50+ Fluid Sunscreen 50 ml", "watsons", "Skincare", "Sun care", 349, "fake"),
+    DemoProduct(
+        "SPF 50+ Fluid Sunscreen 50 ml",
+        "watsons",
+        "Skincare",
+        "Sun care",
+        349,
+        "fake",
+        brand="Daylight Co.",
+    ),
     DemoProduct(
         "Ceramide Barrier Cream 50 ml", "sephora", "Skincare", "Moisturizers", 645, "blocked"
     ),
     DemoProduct("Gentle Foaming Cleanser 150 ml", "rossmann", "Skincare", "Cleansers", 159, "up"),
+    DemoProduct(
+        "Rice Water Bright Cleansing Foam 150 ml",
+        "watsons",
+        "Skincare",
+        "Cleansers",
+        268.22,
+        "first",
+        brand="Lumen Lab",
+    ),
+    DemoProduct(
+        "Centella Calming Cream 50 ml",
+        "gratis",
+        "Skincare",
+        "Moisturizers",
+        420,
+        "two_days",
+        brand="Kuzey Botanics",
+    ),
     DemoProduct("Single-Origin Filter Coffee 500 g", "amazon", "Pantry", "Coffee", 420, "steady"),
     DemoProduct("Cold-Pressed Olive Oil 1 l", "trendyol", "Pantry", "Olive oil", 610, "deal"),
     DemoProduct("Laundry Liquid 2.5 l", "rossmann", "Cleaning", "Laundry", 289, "fake"),
@@ -55,6 +98,9 @@ DEMO_PRODUCTS = [
         "Magnesium Bisglycinate 120 caps", "watsons", "Supplements", "Minerals", 389, "deal"
     ),
 ]
+
+# A floor with nothing on it yet, to show the empty-floor state.
+EMPTY_FLOOR = "Haircare"
 
 _FLOOR_COLOR = "#D9D2C3"
 _SCRIPTED_DAYS = 15  # the last two weeks are scripted so each ending is certain
@@ -121,6 +167,7 @@ def seed_demo(session: Session, days: int = 90, seed: int = 7) -> int:
             store=demo.store,
             category_id=room_for(session, demo.floor, demo.room).id,
             target_price=round(demo.base * 0.85),
+            brand=demo.brand,
         )
         if demo.ending == "blocked":
             error = StoreBlockedError(f"www.{demo.store}.com.tr", 403)
@@ -128,6 +175,16 @@ def seed_demo(session: Session, days: int = 90, seed: int = 7) -> int:
         session.add(product)
         session.flush()
         if demo.ending == "waiting":
+            continue
+        if demo.ending == "first":  # checked once, this morning
+            session.add(PricePoint(product_id=product.id, price=demo.base, checked_at=today))
+            continue
+        if demo.ending == "two_days":  # tracked since yesterday, a little cheaper today
+            yesterday = today - timedelta(days=1)
+            session.add(PricePoint(product_id=product.id, price=demo.base, checked_at=yesterday))
+            session.add(
+                PricePoint(product_id=product.id, price=round(demo.base * 0.9, 2), checked_at=today)
+            )
             continue
 
         history = _random_walk(rng, demo.base, days + 1 - _SCRIPTED_DAYS)
@@ -145,5 +202,7 @@ def seed_demo(session: Session, days: int = 90, seed: int = 7) -> int:
                     checked_at=start + timedelta(days=day),
                 )
             )
+    if session.scalar(select(Category).where(Category.name == EMPTY_FLOOR)) is None:
+        session.add(Category(name=EMPTY_FLOOR, color=_FLOOR_COLOR))
     session.commit()
     return len(DEMO_PRODUCTS)

@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import type { Category, Product } from "../api";
 import { NightWindow } from "../components/NightWindow";
 import { QuietItem } from "../components/QuietItem";
+import { WindowDrawing } from "../components/WindowDrawing";
 import { useCategories, useProducts, useStores } from "../hooks";
 import { useMode } from "../mode";
 import { floorsOf, inkOn, newsLine, placement, roomOf, type Floor } from "../scene";
@@ -30,14 +31,16 @@ export function IndexPage() {
   const chosen = floors.find((f) => f.floor && String(f.floor.id) === params.get("floor"));
   const shown = chosen ? [chosen] : floors;
   const shownProducts = shown.flatMap((f) => f.products);
+  // An empty floor already says so; the subtitle then tells the news of the whole building.
+  const news = newsLine(shownProducts.length > 0 ? shownProducts : all, storeName);
 
   if (all.length === 0) return <EmptyBuilding quiet={mode === "quiet"} />;
 
   if (mode === "quiet")
     return (
       <div className="quiet">
-        <h1 className="poster-title">price diaries</h1>
-        <p className="poster-summary">{newsLine(shownProducts, storeName)}</p>
+        <PosterTitle />
+        <p className="poster-summary">{news}</p>
         <FloorTabs floors={floors} current={chosen?.floor ?? null} />
         {shown.map((f) => (
           <QuietFloor
@@ -70,9 +73,18 @@ export function IndexPage() {
       </div>
 
       <p className="subtitle">
-        <span>{newsLine(shownProducts, storeName)}</span>
+        <span>{news}</span>
       </p>
     </div>
+  );
+}
+
+/** Quiet mode's title: the full name, with a small "the" above, like the night masthead. */
+function PosterTitle() {
+  return (
+    <h1 className="poster-title">
+      <span className="poster-title__the">the</span> <span>price diaries</span>
+    </h1>
   );
 }
 
@@ -81,7 +93,12 @@ function Masthead() {
     <div className="masthead">
       <h1 className="masthead__title">
         <span className="masthead__the">the price</span>{" "}
-        <span className="masthead__diaries">diaries</span>
+        <span className="masthead__diaries">
+          diaries
+          <span className="masthead__panes" aria-hidden="true">
+            diaries
+          </span>
+        </span>
       </h1>
     </div>
   );
@@ -224,7 +241,7 @@ function EmptyBuilding({ quiet }: { quiet: boolean }) {
   if (quiet)
     return (
       <div className="quiet">
-        <h1 className="poster-title">price diaries</h1>
+        <PosterTitle />
         <p className="poster-summary">Nothing tracked yet.</p>
         <p className="empty-actions">
           <Link className="paper-button" to="/add">
@@ -257,10 +274,8 @@ function DarkWindows({ count }: { count: number }) {
   return (
     <div className="dark-windows" aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
-        <span key={i} className="window window--unlit">
-          <span className="window__glass" />
-          <span className="curtain curtain--left" />
-          <span className="curtain curtain--right" />
+        <span key={i} className="dark-windows__one">
+          <WindowDrawing kind="waiting" />
         </span>
       ))}
     </div>

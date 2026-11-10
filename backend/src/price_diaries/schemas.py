@@ -46,6 +46,9 @@ class ProductCreate(BaseModel):
 
 class ProductUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
+    brand: str | None = Field(
+        default=None, max_length=100, description='"" means no brand; checks won\'t fill it in.'
+    )
     category_id: int | None = None
     target_price: float | None = Field(default=None, gt=0)
     selector: str | None = Field(default=None, max_length=300)
@@ -68,6 +71,9 @@ class ProductOut(BaseModel):
     id: int
     url: str
     name: str
+    brand: str | None = Field(
+        default=None, description="From the store page or set by the user; None if unknown."
+    )
     store: str
     category_id: int | None
     target_price: float | None

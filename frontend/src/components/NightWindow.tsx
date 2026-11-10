@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import type { Category, Product } from "../api";
 import { placement, windowState } from "../scene";
 import { Price } from "./Price";
-import { ProductPhoto } from "./ProductPhoto";
+import { WindowDrawing } from "./WindowDrawing";
 
 interface NightWindowProps {
   product: Product;
@@ -35,18 +35,10 @@ export function NightWindow({ product, storeName, room }: NightWindowProps) {
   return (
     <li className={`spot spot--${state.kind}`} style={style}>
       <Link className="spot__link" to={`/products/${product.id}`}>
-        <span className="window" aria-hidden="true">
-          <span className="window__glass">
-            <ProductPhoto
-              src={product.image_url}
-              hint={`${room?.name ?? ""} ${product.name}`}
-              className="window__photo"
-            />
-          </span>
-          <span className="curtain curtain--left" />
-          <span className="curtain curtain--right" />
-          {state.kind === "blocked" && <span className="blinds" />}
-        </span>
+        <WindowDrawing
+          kind={state.kind}
+          photo={{ src: product.image_url, hint: `${room?.name ?? ""} ${product.name}` }}
+        />
 
         <span className="labels">
           <span className="paper paper--taped label label--name">{product.name}</span>

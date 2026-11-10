@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Product, Summary } from "./api";
-import { formatChange, formatPrice, insight, pickFeature } from "./format";
+import { formatChange, formatCheck, formatPrice, insight, pickFeature } from "./format";
 
 const summary = (overrides: Partial<Summary> = {}): Summary => ({
   current: 300,
@@ -31,12 +31,20 @@ const product = (overrides: Partial<Product> = {}): Product => ({
   summary: summary(),
   regular_price: null,
   sparkline: [],
+  brand: null,
   ...overrides,
 });
 
 describe("formatPrice", () => {
   it("uses Turkish grouping and decimal comma", () => {
     expect(formatPrice(1299.9)).toBe("1.299,90");
+  });
+});
+
+describe("formatCheck", () => {
+  it("writes date, time and a Turkish price, the way the chart tooltip shows it", () => {
+    expect(formatCheck(new Date(2026, 10, 10, 9, 17), 268.22)).toBe("10 Nov, 09:17 · ₺268,22");
+    expect(formatCheck(new Date(2026, 0, 3, 21, 5), 1299.9)).toBe("3 Jan, 21:05 · ₺1.299,90");
   });
 });
 
@@ -61,6 +69,24 @@ describe("insight", () => {
     expect(insight(product({ last_error: "Store answered 503." }))).toBe(
       "Last check failed: Store answered 503.",
     );
+  });
+
+  it("asks you to come back after the first check", () => {
+    const one = summary({ previous: null, change_pct: null, current: 250, lowest: 250, lowest_30d: 250, lowest_at: "2026-11-11T09:17:00" });
+    expect(insight(product({ summary: one }), new Date(2026, 10, 11, 20))).toBe(
+      "First check today. Come back tomorrow to see if it moves.",
+    );
+    expect(insight(product({ summary: one }), new Date(2026, 10, 13))).toBe(
+      "First check on 11 Nov. The next check shows if it moves.",
+    );
+    expect(insight(product({ summary: one, target_price: 300 }))).toMatch(/^Below your alert price/);
+  });
+
+  it("doesn't call a price that never moved the lowest", () => {
+    const flat = summary({ current: 300, lowest: 300, highest: 300, lowest_30d: 300, is_all_time_low: true });
+    expect(insight(product({ summary: flat }))).not.toMatch(/lowest price since/);
+    const low = summary({ current: 250, lowest: 250, lowest_30d: 250, is_all_time_low: true });
+    expect(insight(product({ summary: low }))).toBe("The lowest price since you started tracking.");
   });
 
   it("handles products that were never checked", () => {

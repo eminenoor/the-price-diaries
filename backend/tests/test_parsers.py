@@ -165,3 +165,57 @@ def test_explain_lists_every_strategy():
 )
 def test_product_image(html, expected):
     assert Parser().parse(html).image_url == expected
+
+
+@pytest.mark.parametrize(
+    ("html", "expected"),
+    [
+        (
+            '<script type="application/ld+json">{"@type": "Product", "brand": '
+            '{"@type": "Brand", "name": "Some By Mi"}, "offers": {"price": 10}}</script>',
+            "Some By Mi",
+        ),
+        (
+            '<script type="application/ld+json">{"@graph": [{"@type": "Product", '
+            '"brand": "  COSRX ", "offers": {"price": 10}}]}</script>',
+            "COSRX",
+        ),
+        (
+            '<script type="application/ld+json">{"@type": "Product", "brand": '
+            '[{"name": "La Roche-Posay"}], "offers": {"price": 10}}</script>',
+            "La Roche-Posay",
+        ),
+        ('<meta property="product:brand" content="Bioderma">' + META_PAGE, "Bioderma"),
+        (
+            '<div itemprop="brand" itemscope><span itemprop="name">The Ordinary</span></div>'
+            + META_PAGE,
+            "The Ordinary",
+        ),
+        # JSON-LD wins over meta tags.
+        (
+            '<meta property="product:brand" content="Gratis">'
+            '<script type="application/ld+json">{"@type": "Product", "brand": '
+            '{"name": "Some By Mi"}, "offers": {"price": 10}}</script>',
+            "Some By Mi",
+        ),
+        # Empty, or not a Product's brand: none.
+        (
+            '<script type="application/ld+json">{"@type": "Product", "brand": {"name": " "}, '
+            '"offers": {"price": 10}}</script>',
+            None,
+        ),
+        (
+            '<script type="application/ld+json">{"@type": "Organization", "brand": "Gratis"}'
+            "</script>" + META_PAGE,
+            None,
+        ),
+        (JSON_LD_PAGE, None),
+    ],
+)
+def test_product_brand(html, expected):
+    assert Parser().parse(html).brand == expected
+
+
+def test_overlong_brand_is_ignored():
+    html = f'<meta property="product:brand" content="{"x" * 101}">' + META_PAGE
+    assert Parser().parse(html).brand is None

@@ -12,7 +12,6 @@
 :root {
   /* Page */
   --bg: #0e0c14; /* night sky */
-  --facade: #17141f; /* the building behind the windows */
   --text: #f4eee3; /* moonlight */
   --text-dim: #b9b2c4;
   --glow-warm: rgb(214 140 60 / 0.16);
@@ -28,6 +27,7 @@
   --mustard: #e2b33f; /* price strip: a good deal */
   --rouge: #b3261e; /* price strip: a fake sale */
   --on-rouge: #fff6f0;
+  --pencil: #c23b22; /* red grease pencil: the arrow on the chart (not text on paper: 4.3:1) */
 
   /* Windows */
   --glass-dark: #1a1e2c;
@@ -45,6 +45,13 @@
   --blind: #cfc6b3;
   --blind-shadow: #a59c88;
   --silhouette: #2a1a10;
+  --cutout-shadow: rgb(42 26 16 / 0.55); /* under product photos in lit windows */
+  /* DIARIES: the tile in night.css repeats these (a data URI can't use var()). */
+  --mortar: #2e2219; /* mullions */
+  --pane-warm: #ffd27a; /* lit */
+  --pane-orange: #f2a541; /* lit */
+  --pane-navy: #2a3a6a; /* dark, but lighter than the sky so the letters keep their shape */
+  --pane-glow: rgb(255 196 100 / 0.38);
 
   /* Subtitles */
   --subtitle-bg: #050407;

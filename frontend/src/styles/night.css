@@ -26,20 +26,45 @@
   color: var(--text);
 }
 
-/* Lit windows showing through the letters. The tile is mostly warm, lit panes on
-   warm mortar, so the word stays solid and readable against the night. */
+/* The letters are a building at night: large panes between dark mullions,
+   about 40% of them lit (--pane-warm and --pane-orange), the rest dark navy
+   (--pane-navy). The navy glass is lighter than the sky and the lit panes cast
+   a soft glow, so the word glows but still reads as one solid building. The
+   tile repeats those token colours (a data URI can't use var()); the mullion
+   colour is --mortar.
+
+   The word is drawn twice: solid mortar underneath, the panes on top. The panes
+   are eroded by a couple of pixels (#pane-edge in SvgFilters.tsx), so where a
+   letter's edge cuts through a pane there is mortar, not a thin sliver of light
+   that reads as a stray vertical line. */
 .masthead__diaries {
+  position: relative;
   font-size: clamp(3.6rem, 17vw, 13rem);
   letter-spacing: -0.06em;
   text-transform: uppercase;
   padding: 0 0.06em 0.04em 0; /* the clip would trim the last letter's edge */
-  color: var(--lamp);
-  background-color: var(--lamp);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='52'%3E%3Crect width='64' height='52' fill='%237a4a1e'/%3E%3Cg%3E%3Crect x='2' y='2' width='13' height='10' fill='%23f7c66a'/%3E%3Crect x='18' y='2' width='13' height='10' fill='%23ffe3a1'/%3E%3Crect x='34' y='2' width='13' height='10' fill='%23e9a04a'/%3E%3Crect x='50' y='2' width='13' height='10' fill='%23f7c66a'/%3E%3Crect x='2' y='15' width='13' height='10' fill='%23ffd88a'/%3E%3Crect x='18' y='15' width='13' height='10' fill='%23c9a6e8'/%3E%3Crect x='34' y='15' width='13' height='10' fill='%23f7c66a'/%3E%3Crect x='50' y='15' width='13' height='10' fill='%23ffe3a1'/%3E%3Crect x='2' y='28' width='13' height='10' fill='%23e9a04a'/%3E%3Crect x='18' y='28' width='13' height='10' fill='%23f7c66a'/%3E%3Crect x='34' y='28' width='13' height='10' fill='%23ffd88a'/%3E%3Crect x='50' y='28' width='13' height='10' fill='%23e08a5a'/%3E%3Crect x='2' y='41' width='13' height='10' fill='%23f7c66a'/%3E%3Crect x='18' y='41' width='13' height='10' fill='%23ffe3a1'/%3E%3Crect x='34' y='41' width='13' height='10' fill='%23e9a04a'/%3E%3Crect x='50' y='41' width='13' height='10' fill='%23ffd88a'/%3E%3C/g%3E%3C/svg%3E");
-  background-size: 0.36em 0.29em;
+  color: var(--mortar);
+  filter: drop-shadow(0 0 0.09em var(--pane-glow));
+}
+
+.masthead__panes {
+  position: absolute;
+  inset: 0;
+  padding: inherit;
+  filter: url("#pane-edge");
+  background-color: var(--mortar);
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%27144%27%20height=%27100%27%3E%3Crect%20width=%27144%27%20height=%27100%27%20fill=%27%232e2219%27/%3E%3Crect%20x=%272%27%20y=%272%27%20width=%2720%27%20height=%2716%27%20fill=%27%23ffd27a%27/%3E%3Crect%20x=%2726%27%20y=%272%27%20width=%2720%27%20height=%2716%27%20fill=%27%23263561%27/%3E%3Crect%20x=%2750%27%20y=%272%27%20width=%2720%27%20height=%2716%27%20fill=%27%23304274%27/%3E%3Crect%20x=%2774%27%20y=%272%27%20width=%2720%27%20height=%2716%27%20fill=%27%23f2a541%27/%3E%3Crect%20x=%2798%27%20y=%272%27%20width=%2720%27%20height=%2716%27%20fill=%27%23ffd27a%27/%3E%3Crect%20x=%27122%27%20y=%272%27%20width=%2720%27%20height=%2716%27%20fill=%27%23304274%27/%3E%3Crect%20x=%272%27%20y=%2722%27%20width=%2720%27%20height=%2716%27%20fill=%27%23304274%27/%3E%3Crect%20x=%2726%27%20y=%2722%27%20width=%2720%27%20height=%2716%27%20fill=%27%23f2a541%27/%3E%3Crect%20x=%2750%27%20y=%2722%27%20width=%2720%27%20height=%2716%27%20fill=%27%23263561%27/%3E%3Crect%20x=%2774%27%20y=%2722%27%20width=%2720%27%20height=%2716%27%20fill=%27%23304274%27/%3E%3Crect%20x=%2798%27%20y=%2722%27%20width=%2720%27%20height=%2716%27%20fill=%27%232a3a6a%27/%3E%3Crect%20x=%27122%27%20y=%2722%27%20width=%2720%27%20height=%2716%27%20fill=%27%23ffd27a%27/%3E%3Crect%20x=%272%27%20y=%2742%27%20width=%2720%27%20height=%2716%27%20fill=%27%23f2a541%27/%3E%3Crect%20x=%2726%27%20y=%2742%27%20width=%2720%27%20height=%2716%27%20fill=%27%23304274%27/%3E%3Crect%20x=%2750%27%20y=%2742%27%20width=%2720%27%20height=%2716%27%20fill=%27%23ffd27a%27/%3E%3Crect%20x=%2774%27%20y=%2742%27%20width=%2720%27%20height=%2716%27%20fill=%27%23263561%27/%3E%3Crect%20x=%2798%27%20y=%2742%27%20width=%2720%27%20height=%2716%27%20fill=%27%23f2a541%27/%3E%3Crect%20x=%27122%27%20y=%2742%27%20width=%2720%27%20height=%2716%27%20fill=%27%232a3a6a%27/%3E%3Crect%20x=%272%27%20y=%2762%27%20width=%2720%27%20height=%2716%27%20fill=%27%232a3a6a%27/%3E%3Crect%20x=%2726%27%20y=%2762%27%20width=%2720%27%20height=%2716%27%20fill=%27%23263561%27/%3E%3Crect%20x=%2750%27%20y=%2762%27%20width=%2720%27%20height=%2716%27%20fill=%27%23304274%27/%3E%3Crect%20x=%2774%27%20y=%2762%27%20width=%2720%27%20height=%2716%27%20fill=%27%23ffd27a%27/%3E%3Crect%20x=%2798%27%20y=%2762%27%20width=%2720%27%20height=%2716%27%20fill=%27%23263561%27/%3E%3Crect%20x=%27122%27%20y=%2762%27%20width=%2720%27%20height=%2716%27%20fill=%27%23f2a541%27/%3E%3Crect%20x=%272%27%20y=%2782%27%20width=%2720%27%20height=%2716%27%20fill=%27%23304274%27/%3E%3Crect%20x=%2726%27%20y=%2782%27%20width=%2720%27%20height=%2716%27%20fill=%27%23ffd27a%27/%3E%3Crect%20x=%2750%27%20y=%2782%27%20width=%2720%27%20height=%2716%27%20fill=%27%23263561%27/%3E%3Crect%20x=%2774%27%20y=%2782%27%20width=%2720%27%20height=%2716%27%20fill=%27%23304274%27/%3E%3Crect%20x=%2798%27%20y=%2782%27%20width=%2720%27%20height=%2716%27%20fill=%27%23f2a541%27/%3E%3Crect%20x=%27122%27%20y=%2782%27%20width=%2720%27%20height=%2716%27%20fill=%27%23263561%27/%3E%3C/svg%3E");
+  background-size: 0.8em 0.555em; /* 6 × 5 panes, each about 0.11em wide */
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+@media (max-width: 640px) {
+  .masthead__panes {
+    filter: url("#pane-edge-small");
+    background-size: 1.2em 0.833em; /* fewer, bigger panes on thin strokes */
+  }
 }
 
 /* ---------- Floor tabs: cut-out paper strips with tape ---------- */
@@ -114,19 +139,19 @@
 
 /* ---------- The building ---------- */
 
+/* No box: the windows hang loose across the night sky, each placed by a hash of
+   its id (placement() in scene.ts), so the layout is the same on every visit. */
 .building {
-  background: var(--facade);
-  border-top: 14px solid var(--frame); /* the roof line */
   text-align: center;
 }
 
 .floor {
   position: relative;
-  padding: var(--space-4) var(--space-3) var(--space-5);
+  padding: var(--space-4) 0 var(--space-5);
 }
 
 .floor + .floor {
-  border-top: 10px solid var(--bg); /* the slab between floors */
+  margin-top: var(--space-4);
 }
 
 .floor__sign {
@@ -143,14 +168,17 @@
 
 /* ---------- Windows, scattered ---------- */
 
-/* Flex rather than grid, so a floor with one or two windows sits in the middle. */
+/* Scattered across the whole page width: the windows spread out evenly (a floor
+   with two windows doesn't huddle in the middle), then each one is nudged,
+   dropped, sized and tilted by placement(id). The nudge stays inside the gap,
+   so windows never overlap. */
 .windows {
   --scatter: 1;
   --columns: 4;
   --gap-x: var(--space-5);
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: space-evenly;
   align-items: flex-start;
   gap: var(--space-4) var(--gap-x);
   margin: 0;
@@ -181,7 +209,8 @@
   flex: 0 0 calc((100% - (var(--columns) - 1) * var(--gap-x)) / var(--columns));
   min-width: 0;
   padding-top: calc(var(--drop) * var(--scatter) * 1px);
-  transform: rotate(var(--rotate));
+  transform: translateX(calc(var(--nudge) * var(--gap-x) * 0.45 * var(--scatter)))
+    rotate(var(--rotate));
 }
 
 .spot__link {
@@ -235,6 +264,24 @@
   object-fit: contain;
 }
 
+/* In a lit window the photo's white background melts into the light (multiply),
+   and the product casts a slight shadow like a paper cut-out (#cutout-shadow in
+   SvgFilters.tsx). The glass is isolated so the blend only reaches the light. */
+.window--lamp .window__glass,
+.window--rose .window__glass {
+  isolation: isolate;
+}
+
+.window--lamp img.window__photo,
+.window--rose img.window__photo {
+  mix-blend-mode: multiply;
+  filter: url("#cutout-shadow");
+}
+
+.cutout-shadow__colour {
+  flood-color: var(--cutout-shadow);
+}
+
 .silhouette {
   fill: var(--glass-dark);
 }
@@ -262,16 +309,25 @@
   clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 28% 64%, 0 52%);
 }
 
+/* The light follows the status on every page (lighting() in scene.ts):
+   lamp + open curtains for a good deal, rose + half open for a fake sale,
+   dark + closed for no news. */
+
 /* Closed curtains meet in the middle with no tie-back gap. */
-.spot--steady .curtain,
-.spot--up .curtain,
-.spot--waiting .curtain,
-.spot--error .curtain {
+.curtains--closed .curtain {
   clip-path: none;
 }
 
-/* Good deal: lit warm, curtains wide open. */
-.spot--deal .window__glass {
+.curtains--open .curtain {
+  --curtain: 14%;
+}
+
+.curtains--half .curtain {
+  --curtain: 25%;
+}
+
+/* Good deal: lit warm. */
+.window--lamp .window__glass {
   background: radial-gradient(
     circle at 50% 30%,
     var(--lamp-hot) 0,
@@ -280,29 +336,21 @@
   );
 }
 
-.spot--deal .window {
+.window--lamp {
   box-shadow: 0 0 46px 4px var(--lamp-glow);
 }
 
-.spot--deal .curtain {
-  --curtain: 14%;
-}
-
-/* Fake sale: rose-red light, curtains half open. */
-.spot--fake .window__glass {
+/* Fake sale: rose-red light. */
+.window--rose .window__glass {
   background: radial-gradient(circle at 50% 30%, var(--rose) 0, var(--rose-deep) 95%);
 }
 
-.spot--fake .window {
+.window--rose {
   box-shadow: 0 0 46px 4px var(--rose-glow);
 }
 
-.spot--fake .curtain {
-  --curtain: 25%;
-}
-
-.spot--deal .silhouette,
-.spot--fake .silhouette {
+.window--lamp .silhouette,
+.window--rose .silhouette {
   fill: var(--silhouette);
 }
 
@@ -316,10 +364,6 @@
     var(--blind) 0 10px,
     var(--blind-shadow) 10px 12px
   );
-}
-
-.spot--blocked .curtain {
-  --curtain: 12%;
 }
 
 /* ---------- Labels: taped paper strips ---------- */
@@ -379,6 +423,7 @@
 
 /* Nothing new behind this window: the labels fade into the dark. */
 .spot--steady .paper,
+.spot--first .paper,
 .spot--up .paper,
 .spot--waiting .paper,
 .spot--error .paper {
@@ -402,6 +447,7 @@
   max-width: 44rem;
   margin: var(--space-5) auto 0;
   text-align: center;
+  text-wrap: balance;
 }
 
 .subtitle span {
@@ -425,19 +471,15 @@
   padding: var(--space-4) 0 0;
 }
 
-.window--unlit {
+.dark-windows__one {
   width: clamp(4.5rem, 12vw, 7.5rem);
 }
 
-.window--unlit .curtain {
-  clip-path: none;
-}
-
-.window--unlit:nth-child(3n + 2) {
+.dark-windows__one:nth-child(3n + 2) {
   transform: translateY(18px) rotate(1deg);
 }
 
-.window--unlit:nth-child(3n) {
+.dark-windows__one:nth-child(3n) {
   transform: translateY(6px) rotate(-1.2deg);
 }
 

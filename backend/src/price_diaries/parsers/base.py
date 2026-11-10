@@ -20,6 +20,7 @@ class ParsedPrice:
     source: str = "unknown"  # which strategy found it; handy when debugging
     member_price: float | None = None  # loyalty-card price, e.g. Gratis Gold & Platinum
     image_url: str | None = None  # product photo (og:image or JSON-LD), https only
+    brand: str | None = None  # JSON-LD Product.brand.name, or a brand meta tag
 
 
 class PriceNotFoundError(LookupError):
@@ -48,7 +49,7 @@ class Parser:
                 member = _member_price(soup, self.member_labels)
                 if member is not None and member < result.price:
                     result = replace(result, member_price=member)
-                return replace(result, image_url=_image_url(soup))
+                return replace(result, image_url=_image_url(soup), brand=_brand(soup))
         raise PriceNotFoundError("No price found on page. Try adding a 'selector' for it.")
 
     def explain(self, html: str, selector: str | None = None) -> dict[str, float | None]:
@@ -189,6 +190,49 @@ def _image_url(soup: BeautifulSoup) -> str | None:
     for url in candidates:
         if isinstance(url, str) and url.startswith("https://") and len(url) <= 2048:
             return url.strip()
+    return None
+
+
+BRAND_MAX_LENGTH = 100
+
+
+def _brand(soup: BeautifulSoup) -> str | None:
+    """The brand: JSON-LD Product.brand first, then brand meta tags.
+
+    JSON-LD writes it as {"@type": "Brand", "name": "..."}, a plain string, or a
+    list of either. Stores sometimes put their own name there, so it can be
+    edited in the app.
+    """
+    candidates: list[Any] = []
+    for tag in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(tag.string or "")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        for node in _walk(data):
+            if _is_type(node, "Product"):
+                for brand in _as_list(node.get("brand")):
+                    candidates.append(brand.get("name") if isinstance(brand, dict) else brand)
+    for attrs in (
+        {"property": "product:brand"},
+        {"property": "og:brand"},
+        {"name": "brand"},
+        {"itemprop": "brand"},
+    ):
+        tag = soup.find(attrs=attrs)
+        if tag is None:
+            continue
+        if tag.get("content"):
+            candidates.append(tag["content"])
+            continue
+        # Microdata: <div itemprop="brand"><span itemprop="name">Some By Mi</span></div>
+        name = tag.find(attrs={"itemprop": "name"}) or tag
+        candidates.append(name.get("content") or name.get_text(" "))
+    for name in candidates:
+        if isinstance(name, str):
+            clean = " ".join(name.split())
+            if clean and len(clean) <= BRAND_MAX_LENGTH:
+                return clean
     return None
 
 

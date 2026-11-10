@@ -5,12 +5,14 @@ import { LinerNotes } from "../components/LinerNotes";
 import { PencilCircle, PencilX } from "../components/Pencil";
 import { Price, RegularPriceNote } from "../components/Price";
 import { ProductPhoto } from "../components/ProductPhoto";
-import { formatDate, insight } from "../format";
+import { WindowDrawing } from "../components/WindowDrawing";
+import { insight } from "../format";
 import {
   useCategories,
   useCheckOne,
   useProduct,
   useRemoveProduct,
+  useSetBrand,
   useSetTarget,
   useStores,
 } from "../hooks";
@@ -67,23 +69,16 @@ export function ProductPage() {
               {state.kind === "fake" && <PencilX />}
             </span>
           ) : (
-            <span className="window window--big">
-              <span className="window__glass">
-                <ProductPhoto
-                  src={product.image_url}
-                  hint={`${room?.name ?? ""} ${product.name}`}
-                  className="window__photo"
-                />
-              </span>
-              <span className="curtain curtain--left" />
-              <span className="curtain curtain--right" />
-              {state.kind === "blocked" && <span className="blinds" />}
-            </span>
+            <WindowDrawing
+              big
+              kind={state.kind}
+              photo={{ src: product.image_url, hint: `${room?.name ?? ""} ${product.name}` }}
+            />
           )}
         </div>
 
         <div className="room__credits">
-          <p className="room__presents">{storeName} presents</p>
+          {product.brand && <p className="room__presents">{product.brand} presents</p>}
           <h1 className="room__name">{product.name}</h1>
           {room && <p className="room__where">{room.name.toLowerCase()}</p>}
 
@@ -128,21 +123,15 @@ export function ProductPage() {
         </div>
       </div>
 
-      {s && (
-        <dl className="facts">
-          <Fact label="Lowest" value={s.lowest} note={formatDate(s.lowest_at)} />
-          <Fact label="Highest" value={s.highest} note={formatDate(s.highest_at)} />
-          <Fact label="Lowest in 30 days" value={s.lowest_30d} />
-          <AlertFact id={product.id} target={product.target_price} />
-        </dl>
-      )}
-
-      {product.history.length > 0 ? (
+      {product.history.length === 1 ? (
+        <p className="chart-note">the chart starts after a few days of checks</p>
+      ) : product.history.length > 1 && s ? (
         <section className="torn" aria-label="Price chart">
           <Suspense fallback={<div className="chart__canvas" />}>
             <PriceChart
               history={product.history}
               anomalies={product.anomalies}
+              summary={s}
               target={product.target_price}
             />
           </Suspense>
@@ -155,31 +144,71 @@ export function ProductPage() {
         <LinerNotes history={product.history} anomalies={product.anomalies} />
       )}
 
-      <p className="room__stop">
-        <button type="button" className="text-button" onClick={stopTracking}>
-          Stop tracking
-        </button>
-      </p>
+      <div className="room__edit">
+        {/* Without a chart there's no dashed line to write the alert price on. */}
+        <AlertEditor
+          id={product.id}
+          target={product.target_price}
+          showValue={product.history.length < 2}
+        />
+        <BrandEditor id={product.id} brand={product.brand} />
+        <p className="room__stop">
+          <button type="button" className="text-button" onClick={stopTracking}>
+            Stop tracking
+          </button>
+        </p>
+      </div>
     </article>
   );
 }
 
-function Fact({ label, value, note }: { label: string; value: number; note?: string }) {
+/** The brand comes from the store page; stores sometimes get it wrong, so it can be changed. */
+function BrandEditor({ id, brand }: { id: number; brand: string | null }) {
+  const setBrand = useSetBrand();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(brand ?? "");
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    await setBrand.mutateAsync({ id, brand: value.trim() });
+    setEditing(false);
+  }
+
+  if (!editing)
+    return (
+      <button
+        type="button"
+        className="text-button"
+        onClick={() => {
+          setValue(brand ?? "");
+          setEditing(true);
+        }}
+      >
+        {brand ? "Change brand" : "Add the brand"}
+      </button>
+    );
   return (
-    <div className="fact">
-      <dt>{label}</dt>
-      <dd>
-        <Price value={value} size="large" />
-        {note && <span className="fact__note">{note}</span>}
-      </dd>
-    </div>
+    <form className="edit-form" onSubmit={save}>
+      <label>
+        Brand
+        <input value={value} maxLength={100} onChange={(e) => setValue(e.target.value)} autoFocus />
+      </label>
+      <button className="paper-button paper-button--mustard" type="submit" disabled={setBrand.isPending}>
+        {value.trim() ? "Save brand" : "Remove brand"}
+      </button>
+      <button type="button" className="text-button" onClick={() => setEditing(false)}>
+        Cancel
+      </button>
+    </form>
   );
 }
 
-function AlertFact({ id, target }: { id: number; target: number | null }) {
+/** The alert price is written on the chart; this changes it. */
+function AlertEditor(props: { id: number; target: number | null; showValue: boolean }) {
+  const { id, target, showValue } = props;
   const setTarget = useSetTarget();
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(target ? String(target).replace(".", ",") : "");
+  const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function save(event: FormEvent) {
@@ -194,40 +223,51 @@ function AlertFact({ id, target }: { id: number; target: number | null }) {
     setError(null);
   }
 
-  return (
-    <div className="fact">
-      <dt>Alert price</dt>
-      <dd>
-        {editing ? (
-          <form className="alert-form" onSubmit={save}>
-            <input
-              aria-label="Alert price"
-              inputMode="decimal"
-              value={value}
-              onChange={(e) => {
-                setValue(e.target.value);
-                setError(null);
-              }}
-              autoFocus
-            />
-            <button className="paper-button paper-button--mustard" type="submit">
-              Save alert price
-            </button>
-            {error && (
-              <span className="fact__error" role="alert">
-                {error}
-              </span>
-            )}
-          </form>
-        ) : (
-          <>
-            {target ? <Price value={target} size="large" /> : <span className="fact__none">None set</span>}
-            <button type="button" className="text-button" onClick={() => setEditing(true)}>
-              {target ? "Change alert price" : "Set an alert price"}
-            </button>
-          </>
+  if (!editing)
+    return (
+      <span className="edit-row__item">
+        {showValue && target !== null && (
+          <span>
+            Alert price <Price value={target} />
+          </span>
         )}
-      </dd>
-    </div>
+        <button
+          type="button"
+          className="text-button"
+          onClick={() => {
+            setValue(target ? String(target).replace(".", ",") : "");
+            setEditing(true);
+          }}
+        >
+          {target ? "Change alert price" : "Set an alert price"}
+        </button>
+      </span>
+    );
+  return (
+    <form className="edit-form" onSubmit={save}>
+      <label>
+        Alert price
+        <input
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setError(null);
+          }}
+          autoFocus
+        />
+      </label>
+      <button className="paper-button paper-button--mustard" type="submit" disabled={setTarget.isPending}>
+        Save alert price
+      </button>
+      <button type="button" className="text-button" onClick={() => setEditing(false)}>
+        Cancel
+      </button>
+      {error && (
+        <span className="edit-form__error" role="alert">
+          {error}
+        </span>
+      )}
+    </form>
   );
 }

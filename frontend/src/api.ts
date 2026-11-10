@@ -38,6 +38,8 @@ export interface Product {
   id: number;
   url: string;
   name: string;
+  /** From the store page, or set by the user; null if unknown. */
+  brand: string | null;
   store: string;
   /** A room (or a floor). See Category. */
   category_id: number | null;
@@ -88,6 +90,11 @@ export interface NewProduct {
   target_price?: number;
 }
 
+/** Fields that can be changed later. brand "" removes it, so checks won't fill it in. */
+export interface ProductChanges extends Partial<NewProduct> {
+  brand?: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -122,7 +129,7 @@ export const api = {
   product: (id: number) => request<ProductDetail>(`/products/${id}`),
   create: (body: NewProduct) =>
     request<Product>("/products", { method: "POST", body: JSON.stringify(body) }),
-  update: (id: number, body: Partial<NewProduct>) =>
+  update: (id: number, body: ProductChanges) =>
     request<Product>(`/products/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   remove: (id: number) => request<void>(`/products/${id}`, { method: "DELETE" }),
   check: (id: number) => request<CheckResult>(`/products/${id}/check`, { method: "POST" }),

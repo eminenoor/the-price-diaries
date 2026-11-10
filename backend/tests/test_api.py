@@ -174,3 +174,50 @@ def test_successful_check_clears_block(client, fake_pages):
     product_id = add_product(client).json()["id"]
     client.post(f"/api/products/{product_id}/check")
     assert client.get(f"/api/products/{product_id}").json()["blocked"] is False
+
+
+BRAND_PAGE = (
+    '<script type="application/ld+json">'
+    '{"@type": "Product", "brand": {"@type": "Brand", "name": "Some By Mi"}, '
+    '"offers": {"price": "289.90", "priceCurrency": "TRY"}}'
+    "</script>"
+)
+
+
+def test_check_stores_brand(client, fake_pages):
+    fake_pages[URL] = BRAND_PAGE
+    product_id = add_product(client).json()["id"]
+    assert client.get(f"/api/products/{product_id}").json()["brand"] is None
+    client.post(f"/api/products/{product_id}/check")
+    assert client.get(f"/api/products/{product_id}").json()["brand"] == "Some By Mi"
+
+
+def test_check_all_stores_brand(client, fake_pages):
+    fake_pages[URL] = BRAND_PAGE
+    add_product(client)
+    client.post("/api/check")
+    assert client.get("/api/products").json()[0]["brand"] == "Some By Mi"
+
+
+def test_user_brand_survives_checks(client, fake_pages):
+    fake_pages[URL] = BRAND_PAGE
+    product_id = add_product(client).json()["id"]
+    updated = client.patch(f"/api/products/{product_id}", json={"brand": "  Some  By Mi Lab "})
+    assert updated.json()["brand"] == "Some By Mi Lab"
+    client.post(f"/api/products/{product_id}/check")
+    assert client.get(f"/api/products/{product_id}").json()["brand"] == "Some By Mi Lab"
+
+
+def test_removed_brand_stays_removed(client, fake_pages):
+    fake_pages[URL] = BRAND_PAGE
+    product_id = add_product(client).json()["id"]
+    client.post(f"/api/products/{product_id}/check")
+    assert client.patch(f"/api/products/{product_id}", json={"brand": ""}).json()["brand"] is None
+    client.post(f"/api/products/{product_id}/check")
+    assert client.get(f"/api/products/{product_id}").json()["brand"] is None
+
+
+def test_brand_length_is_limited(client):
+    product_id = add_product(client).json()["id"]
+    response = client.patch(f"/api/products/{product_id}", json={"brand": "x" * 101})
+    assert response.status_code == 422
