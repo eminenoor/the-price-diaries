@@ -7,7 +7,7 @@
 ![TypeScript](https://img.shields.io/badge/typescript-strict-2b1f2a)
 ![License: MIT](https://img.shields.io/badge/license-MIT-2b1f2a)
 
-![The Price Diaries dashboard with the best deal of the day and the list of tracked products](docs/screenshots/home.png)
+![The night view: tracked products as lit and dark windows of a building, floor tabs and a subtitle with the news](docs/screenshots/home.png)
 
 <sub>Screenshots use generated demo data (`price-diaries demo`), not scraped prices.</sub>
 
@@ -21,13 +21,15 @@ Beauty retailers change prices almost daily. A common pattern is to raise a pric
 - **Fake-sale detection.** Flags a discount that only undoes a recent price rise.
 - **Unusual-rise detection** with a robust statistical method (see below), tuned per product.
 - **Loyalty-card prices.** When a store shows a member price (such as Gratis Gold & Platinum), that's the price tracked, with the regular price shown beside it.
-- **Target prices.** Set the price you're willing to pay and see when it's reached.
+- **Alert prices.** Set the price you're willing to pay and see when it's reached.
+- **Floors and rooms.** Group products into floors (Skincare, Pantry, Cleaning, Supplements, or your own) and rooms inside them (Toners, Coffee…).
+- **Two ways to look.** A night view where good deals light up their window, and a quiet daylight mode with just the facts.
 - **Full history** for every product: lowest, highest, 30-day low, and a chart of every check.
 - **Local-first and private.** Everything runs and stays on your own computer.
 
 | Product detail | On a phone |
 | --- | --- |
-| ![Product detail with price chart and statistics](docs/screenshots/detail.png) | ![Mobile layout](docs/screenshots/mobile.png) |
+| ![Product page: a lit window, the price on mustard paper, a chart on torn paper and the history as liner notes](docs/screenshots/detail.png) | ![Quiet mode on a phone: a daylight poster with red pencil circles around good deals](docs/screenshots/mobile.png) |
 
 ## How it works
 
@@ -67,7 +69,7 @@ where $\tilde{r}$ is the median return and MAD is the median absolute deviation.
 | Backend | Python 3.11+, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic, APScheduler |
 | Scraping | httpx (async), BeautifulSoup, Playwright (optional) |
 | Frontend | React 19, TypeScript (strict), Vite, TanStack Query, React Router, Observable Plot |
-| Styling | Hand-written CSS with design tokens, self-hosted Bodoni Moda and Jost |
+| Styling | Hand-written CSS with design tokens, self-hosted Bricolage Grotesque, Figtree and Nanum Pen Script |
 | Quality | pytest, Vitest, Testing Library, Ruff, pre-commit, GitHub Actions |
 | Tooling | uv for Python, npm for Node |
 
@@ -172,7 +174,7 @@ docs/               screenshots and design notes
 
 ## Design
 
-The interface is modelled on print beauty editorials rather than a typical dashboard. Prices are set like shelf tags in a Didone typeface, with kuruş raised and underlined. Read the reasoning in [docs/design.md](docs/design.md).
+"The Price Diaries, after dark": your products are the windows of a building at night. A real deal lights its window warm, a fake sale glows rose-red, and a window with no news stays dark behind its curtains. Quiet mode turns it into a daylight poster with red grease-pencil marks. Read the reasoning in [docs/design.md](docs/design.md).
 
 ## Roadmap
 

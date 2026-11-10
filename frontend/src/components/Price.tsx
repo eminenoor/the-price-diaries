@@ -7,20 +7,22 @@ interface PriceProps {
 }
 
 /**
- * Prices set like a printed shelf tag: lira in a Didone face, kuruş raised
- * and smaller. This is the design's signature element.
+ * Prices in Bricolage Grotesque 800, set tight like a film-poster credit:
+ * a small lira sign, the lira amount, and the kuruş raised and smaller.
  */
 export function Price({ value, size = "row", className = "" }: PriceProps) {
   const [lira, kurus] = formatPrice(value).split(",");
   return (
-    <span className={`price price--${size} ${className}`} aria-label={`${formatPrice(value)} lira`}>
+    <span className={`price price--${size} ${className}`}>
+      {/* aria-label isn't allowed on a plain span, so screen readers get real text. */}
+      <span className="visually-hidden">{formatPrice(value)} lira</span>
       <span className="price__currency" aria-hidden="true">
         ₺
       </span>
       <span aria-hidden="true">{lira}</span>
-      <sup className="price__kurus" aria-hidden="true">
-        {kurus}
-      </sup>
+      <span className="price__kurus" aria-hidden="true">
+        ,{kurus}
+      </span>
     </span>
   );
 }

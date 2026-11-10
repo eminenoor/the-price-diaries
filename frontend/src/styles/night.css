@@ -1,0 +1,456 @@
+/* ---------- Night view: the building after dark ---------- */
+
+.night {
+  text-align: center;
+}
+
+/* ---------- Masthead ---------- */
+
+.masthead {
+  padding: var(--space-3) 0 var(--space-4);
+}
+
+.masthead__title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.82;
+}
+
+.masthead__the {
+  font-family: var(--font-text);
+  font-weight: 500;
+  font-style: italic;
+  font-size: var(--step-2);
+  letter-spacing: 0;
+  color: var(--text);
+}
+
+/* Lit windows showing through the letters. The tile is mostly warm, lit panes on
+   warm mortar, so the word stays solid and readable against the night. */
+.masthead__diaries {
+  font-size: clamp(3.6rem, 17vw, 13rem);
+  letter-spacing: -0.06em;
+  text-transform: uppercase;
+  padding: 0 0.06em 0.04em 0; /* the clip would trim the last letter's edge */
+  color: var(--lamp);
+  background-color: var(--lamp);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='52'%3E%3Crect width='64' height='52' fill='%237a4a1e'/%3E%3Cg%3E%3Crect x='2' y='2' width='13' height='10' fill='%23f7c66a'/%3E%3Crect x='18' y='2' width='13' height='10' fill='%23ffe3a1'/%3E%3Crect x='34' y='2' width='13' height='10' fill='%23e9a04a'/%3E%3Crect x='50' y='2' width='13' height='10' fill='%23f7c66a'/%3E%3Crect x='2' y='15' width='13' height='10' fill='%23ffd88a'/%3E%3Crect x='18' y='15' width='13' height='10' fill='%23c9a6e8'/%3E%3Crect x='34' y='15' width='13' height='10' fill='%23f7c66a'/%3E%3Crect x='50' y='15' width='13' height='10' fill='%23ffe3a1'/%3E%3Crect x='2' y='28' width='13' height='10' fill='%23e9a04a'/%3E%3Crect x='18' y='28' width='13' height='10' fill='%23f7c66a'/%3E%3Crect x='34' y='28' width='13' height='10' fill='%23ffd88a'/%3E%3Crect x='50' y='28' width='13' height='10' fill='%23e08a5a'/%3E%3Crect x='2' y='41' width='13' height='10' fill='%23f7c66a'/%3E%3Crect x='18' y='41' width='13' height='10' fill='%23ffe3a1'/%3E%3Crect x='34' y='41' width='13' height='10' fill='%23e9a04a'/%3E%3Crect x='50' y='41' width='13' height='10' fill='%23ffd88a'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 0.36em 0.29em;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ---------- Floor tabs: cut-out paper strips with tape ---------- */
+
+.floor-tabs ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3) var(--space-2);
+  margin: 0;
+  padding: var(--space-2) 0;
+  list-style: none;
+}
+
+.floor-tabs li {
+  transform: rotate(var(--tilt, 0deg));
+}
+
+.floor-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5em;
+  min-height: 2.75rem;
+  padding: 0.55em 1.1em;
+  background: var(--strip, var(--paper));
+  color: var(--strip-ink, var(--ink));
+  font-weight: 700;
+  text-decoration: none;
+  clip-path: polygon(0 6%, 4% 0, 60% 4%, 100% 0, 98% 50%, 100% 96%, 40% 100%, 2% 96%, 1% 50%);
+}
+
+.floor-tab__count {
+  font-size: var(--step--1);
+  font-weight: 500;
+}
+
+/* The floor you are on: lifted and underlined, never colour alone. */
+.floor-tab[aria-current="page"] {
+  transform: translateY(-4px);
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-underline-offset: 0.3em;
+}
+
+.floor-tab:focus-visible {
+  outline: 3px solid var(--strip-ink, var(--ink));
+  outline-offset: -7px;
+}
+
+/* ---------- "tonight on the ▯ skincare ▯ floor" ---------- */
+
+.tonight {
+  margin: var(--space-4) auto var(--space-4);
+  max-width: 22ch;
+  font-size: var(--step-3);
+  line-height: 1.05;
+}
+
+.tiny-window {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.62em;
+  margin: 0 0.06em;
+  vertical-align: -0.02em;
+  border: 0.06em solid var(--frame);
+  background:
+    linear-gradient(var(--frame), var(--frame)) center / 0.06em 100% no-repeat,
+    linear-gradient(var(--frame), var(--frame)) center 40% / 100% 0.06em no-repeat,
+    var(--lamp);
+}
+
+/* ---------- The building ---------- */
+
+.building {
+  background: var(--facade);
+  border-top: 14px solid var(--frame); /* the roof line */
+  text-align: center;
+}
+
+.floor {
+  position: relative;
+  padding: var(--space-4) var(--space-3) var(--space-5);
+}
+
+.floor + .floor {
+  border-top: 10px solid var(--bg); /* the slab between floors */
+}
+
+.floor__sign {
+  background: var(--strip, var(--paper));
+  color: var(--strip-ink, var(--ink));
+  font-size: var(--step-2);
+  padding: 0.3em 0.8em 0.35em;
+}
+
+.floor__empty {
+  padding: var(--space-4) 0 var(--space-2);
+  color: var(--text-dim);
+}
+
+/* ---------- Windows, scattered ---------- */
+
+/* Flex rather than grid, so a floor with one or two windows sits in the middle. */
+.windows {
+  --scatter: 1;
+  --columns: 4;
+  --gap-x: var(--space-5);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--space-4) var(--gap-x);
+  margin: 0;
+  padding: var(--space-4) 0 0;
+  list-style: none;
+}
+
+@media (max-width: 1000px) {
+  .windows {
+    --columns: 3;
+    --gap-x: var(--space-4);
+  }
+}
+
+/* Mobile: two loose columns. */
+@media (max-width: 640px) {
+  .windows {
+    --scatter: 0.4;
+    --columns: 2;
+    --gap-x: var(--space-3);
+  }
+  .floor {
+    padding-inline: var(--space-2);
+  }
+}
+
+.spot {
+  flex: 0 0 calc((100% - (var(--columns) - 1) * var(--gap-x)) / var(--columns));
+  min-width: 0;
+  padding-top: calc(var(--drop) * var(--scatter) * 1px);
+  transform: rotate(var(--rotate));
+}
+
+.spot__link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: calc(var(--size) * 100%);
+  margin-left: calc((1 - var(--size)) * 50% * (1 + var(--nudge)));
+  color: inherit;
+  text-decoration: none;
+}
+
+.spot__link:focus-visible {
+  outline-offset: 8px;
+}
+
+.window {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border: 10px solid var(--frame);
+  background: var(--frame);
+  overflow: hidden;
+}
+
+.window__glass {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: linear-gradient(var(--glass-dark-2), var(--glass-dark));
+}
+
+/* Glazing bars, in front of the product. */
+.window__glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(var(--frame), var(--frame)) center / 6px 100% no-repeat,
+    linear-gradient(var(--frame), var(--frame)) center 36% / 100% 6px no-repeat;
+}
+
+.window__photo {
+  position: relative;
+  max-width: 78%;
+  height: 70%;
+  margin-bottom: 4%;
+  object-fit: contain;
+}
+
+.silhouette {
+  fill: var(--glass-dark);
+}
+
+.curtain {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: var(--curtain, 51%);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--velvet) 0 7px,
+    var(--velvet-deep) 7px 12px
+  );
+}
+
+.curtain--left {
+  left: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 52%, 72% 64%, 100% 100%, 0 100%);
+}
+
+.curtain--right {
+  right: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 28% 64%, 0 52%);
+}
+
+/* Closed curtains meet in the middle with no tie-back gap. */
+.spot--steady .curtain,
+.spot--up .curtain,
+.spot--waiting .curtain,
+.spot--error .curtain {
+  clip-path: none;
+}
+
+/* Good deal: lit warm, curtains wide open. */
+.spot--deal .window__glass {
+  background: radial-gradient(
+    circle at 50% 30%,
+    var(--lamp-hot) 0,
+    var(--lamp) 32%,
+    var(--lamp-deep) 95%
+  );
+}
+
+.spot--deal .window {
+  box-shadow: 0 0 46px 4px var(--lamp-glow);
+}
+
+.spot--deal .curtain {
+  --curtain: 14%;
+}
+
+/* Fake sale: rose-red light, curtains half open. */
+.spot--fake .window__glass {
+  background: radial-gradient(circle at 50% 30%, var(--rose) 0, var(--rose-deep) 95%);
+}
+
+.spot--fake .window {
+  box-shadow: 0 0 46px 4px var(--rose-glow);
+}
+
+.spot--fake .curtain {
+  --curtain: 25%;
+}
+
+.spot--deal .silhouette,
+.spot--fake .silhouette {
+  fill: var(--silhouette);
+}
+
+/* Blocked store: blinds down. */
+.blinds {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--blind) 0 10px,
+    var(--blind-shadow) 10px 12px
+  );
+}
+
+.spot--blocked .curtain {
+  --curtain: 12%;
+}
+
+/* ---------- Labels: taped paper strips ---------- */
+
+.labels {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  margin-top: 1rem;
+}
+
+.label {
+  max-width: 100%;
+  font-size: 0.9375rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.label--name {
+  font-weight: 700;
+}
+
+.label--store {
+  font-size: var(--step--1);
+}
+
+.label--price {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.15em 0.55em;
+  padding: 0.3em 0.8em;
+  background: var(--paper-faded);
+  color: var(--ink);
+}
+
+.label__words {
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+.label__card {
+  font-size: var(--step--1);
+}
+
+.spot--deal .label--price {
+  background: var(--mustard);
+}
+
+.spot--fake .label--price {
+  background: var(--rouge);
+  color: var(--on-rouge);
+}
+
+/* Nothing new behind this window: the labels fade into the dark. */
+.spot--steady .paper,
+.spot--up .paper,
+.spot--waiting .paper,
+.spot--error .paper {
+  background: var(--paper-faded);
+}
+
+/* A short handwritten note. */
+.note {
+  max-width: 13em;
+  padding: 0.25em 0.7em 0.3em;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-hand);
+  font-size: 1.5rem;
+  line-height: 1.05;
+}
+
+/* ---------- The subtitle ---------- */
+
+.subtitle {
+  max-width: 44rem;
+  margin: var(--space-5) auto 0;
+  text-align: center;
+}
+
+.subtitle span {
+  padding: 0.2em 0.6em;
+  background: var(--subtitle-bg);
+  color: var(--subtitle-ink);
+  font-weight: 700;
+  font-size: 1.125rem;
+  line-height: 1.9;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* ---------- States: empty floors and the empty building ---------- */
+
+.dark-windows {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-4) 0 0;
+}
+
+.window--unlit {
+  width: clamp(4.5rem, 12vw, 7.5rem);
+}
+
+.window--unlit .curtain {
+  clip-path: none;
+}
+
+.window--unlit:nth-child(3n + 2) {
+  transform: translateY(18px) rotate(1deg);
+}
+
+.window--unlit:nth-child(3n) {
+  transform: translateY(6px) rotate(-1.2deg);
+}
+
+.building--dark {
+  padding: var(--space-3) var(--space-3) var(--space-5);
+}
+
+.building--dark .dark-windows {
+  max-width: 40rem; /* two even rows of four */
+  margin: 0 auto var(--space-4);
+}
+
+.empty-actions {
+  margin-top: var(--space-3);
+  text-align: center;
+}

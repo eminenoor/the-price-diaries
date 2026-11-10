@@ -1,0 +1,319 @@
+/* ---------- Base: shared by night view and quiet mode ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-text);
+  font-weight: 500;
+  font-size: var(--step-0);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Faint warm and deep-blue glows in the night sky. Quiet mode has none. */
+:root:not([data-mode="quiet"]) body {
+  background:
+    radial-gradient(60rem 40rem at 12% -10%, var(--glow-warm), transparent 70%),
+    radial-gradient(50rem 36rem at 95% 30%, var(--glow-blue), transparent 70%),
+    radial-gradient(40rem 30rem at 40% 110%, var(--glow-warm), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+strong,
+b {
+  font-weight: 700;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-title);
+  font-weight: 800;
+  letter-spacing: var(--tight);
+  line-height: 0.95;
+}
+
+p {
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+code {
+  font-size: 0.95em;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.visually-hidden::before,
+.visually-hidden::after {
+  display: none;
+}
+
+/* No animations anywhere; this only guards against browser defaults. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.page {
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 0 var(--gutter) var(--space-5);
+}
+
+/* ---------- Header bar ---------- */
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) 0;
+}
+
+.topbar__home {
+  font-family: var(--font-title);
+  font-weight: 800;
+  letter-spacing: var(--tight);
+  font-size: var(--step-1);
+  text-decoration: none;
+}
+
+.topbar__home[aria-current="page"] {
+  display: none; /* the masthead is right below */
+}
+
+@media (max-width: 640px) {
+  .topbar,
+  .topbar__actions {
+    justify-content: center;
+  }
+}
+
+.topbar:has(.topbar__home[aria-current="page"]) {
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .topbar:has(.topbar__home[aria-current="page"]) {
+    justify-content: center;
+  }
+}
+
+.topbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.topbar__result {
+  font-size: var(--step--1);
+  color: var(--text-dim);
+}
+
+/* ---------- Price ---------- */
+
+.price {
+  font-family: var(--font-title);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.price__currency {
+  font-size: max(0.6em, 13px);
+  margin-right: 0.06em;
+  vertical-align: 0.3em;
+}
+
+.price__kurus {
+  font-size: max(0.55em, 13px);
+  vertical-align: 0.42em;
+  letter-spacing: 0;
+}
+
+.price--row {
+  font-size: 1rem;
+}
+
+.price--large {
+  font-size: 1.6rem;
+}
+
+.price--hero {
+  font-size: clamp(3rem, 9vw, 6.5rem);
+  letter-spacing: var(--tight);
+}
+
+.regular-note {
+  font-size: var(--step--1);
+}
+
+/* ---------- Paper: strips, notes and buttons ---------- */
+
+.paper {
+  position: relative;
+  display: inline-block;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0.35em 0.8em;
+}
+
+/* A strip of tape across the top. Decorative. */
+.paper--taped::before {
+  content: "";
+  position: absolute;
+  top: -0.72em; /* sits above the text, only overlapping the paper's edge */
+  left: 50%;
+  width: 3.2em;
+  height: 0.9em;
+  background: var(--tape);
+  transform: translateX(-50%) rotate(var(--tape-angle, -4deg));
+  pointer-events: none;
+}
+
+.paper-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.5em 1.1em;
+  border: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-weight: 700;
+  font-size: var(--step-0);
+  text-decoration: none;
+  cursor: pointer;
+  /* Torn-ish edges: a slightly irregular polygon instead of a rounded box. */
+  clip-path: polygon(0 4%, 6% 0, 52% 3%, 100% 0, 98% 52%, 100% 100%, 47% 97%, 3% 100%, 0 49%);
+}
+
+.paper-button--mustard {
+  background: var(--mustard);
+}
+
+.paper-button:disabled {
+  cursor: default;
+  background: var(--paper-faded);
+}
+
+/* clip-path would cut off the outline, so draw focus inside the button. */
+.paper-button:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: -6px;
+}
+
+.text-button {
+  border: 0;
+  padding: 0.25em 0;
+  background: none;
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+  cursor: pointer;
+}
+
+.mode-toggle {
+  border: 2px solid currentColor;
+  background: transparent;
+  color: var(--text);
+  min-height: 2.75rem;
+  padding: 0.35em 0.9em;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.status {
+  padding: var(--space-5) 0;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.status--error {
+  color: var(--text);
+}
+
+.colophon {
+  margin-top: var(--space-6);
+  text-align: center;
+  font-size: var(--step--1);
+  color: var(--text-dim);
+}
+
+/* ---------- Quiet mode resets for shared pieces ---------- */
+
+:root[data-mode="quiet"] .paper,
+:root[data-mode="quiet"] .paper-button {
+  background: transparent;
+  color: var(--text);
+  clip-path: none;
+  transform: none !important;
+}
+
+:root[data-mode="quiet"] .paper--taped::before {
+  display: none;
+}
+
+:root[data-mode="quiet"] .paper-button {
+  border: 2px solid var(--rule);
+}
+
+:root[data-mode="quiet"] .paper-button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}

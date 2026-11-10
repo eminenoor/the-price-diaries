@@ -1,0 +1,229 @@
+/* ---------- Pin a new window ---------- */
+
+.pin__title {
+  margin: var(--space-3) 0 var(--space-5);
+  text-align: center;
+  font-size: var(--step-4);
+}
+
+.pin__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: center;
+  gap: var(--space-5);
+  max-width: 62rem;
+  margin: 0 auto;
+}
+
+@media (max-width: 760px) {
+  .pin__stage {
+    grid-template-columns: 1fr;
+  }
+  .empty-window {
+    width: min(8rem, 40%) !important;
+  }
+}
+
+/* The taped paper note. */
+.pin-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-4);
+  transform: rotate(-1deg);
+  text-align: left;
+}
+
+.pin-note.paper--taped::before {
+  width: 6em;
+  height: 1.4em;
+  top: -0.8em;
+}
+
+.line-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.line-field__label {
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+
+/* Underlined fields, like writing on a line. */
+.line-field input,
+.chip-new input {
+  width: 100%;
+  padding: 0.35em 0;
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--step-1);
+}
+
+.line-field input::placeholder,
+.chip-new input::placeholder {
+  color: var(--ink-placeholder);
+  opacity: 1;
+}
+
+.line-field input:disabled {
+  border-bottom-style: dashed;
+}
+
+.line-field input:focus-visible,
+.chip-new input:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.line-field--short input {
+  max-width: 10rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.chips legend {
+  margin-bottom: 0.4rem;
+  padding: 0;
+}
+
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.3em 0.9em;
+  border: 2px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chip input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Chosen: filled in, plus a tick, so it isn't colour alone. */
+.chip:has(input:checked) {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.chip:has(input:checked) span::before {
+  content: "✓ ";
+}
+
+.chip:has(input:focus-visible) {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.chip--new {
+  border-style: dashed;
+  font: inherit;
+  font-weight: 700;
+}
+
+.chip-new {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.chip-new input {
+  width: 9rem;
+  font-size: var(--step-0);
+}
+
+.pin-note .text-button {
+  color: var(--ink);
+}
+
+.pin-note .paper-button {
+  align-self: flex-start;
+}
+
+.pin-note__hint {
+  font-size: var(--step--1);
+}
+
+.pin-note__error {
+  padding: 0.4em 0.7em;
+  background: var(--rouge);
+  color: var(--on-rouge);
+  font-weight: 700;
+}
+
+/* A dashed, empty window waiting for its product. */
+.pin__preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.empty-window {
+  display: block;
+  width: min(15rem, 70%);
+  aspect-ratio: 3 / 4;
+  border: 4px dashed var(--text-dim);
+  background:
+    linear-gradient(var(--text-dim), var(--text-dim)) center / 3px 100% no-repeat,
+    linear-gradient(var(--text-dim), var(--text-dim)) center 36% / 100% 3px no-repeat;
+  transform: rotate(1.5deg);
+}
+
+.pin__preview-label {
+  max-width: 16rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* Quiet mode: no tape, no tilt, plain ink. */
+:root[data-mode="quiet"] .pin-note {
+  border: 2px solid var(--rule);
+  padding: var(--space-4);
+}
+
+:root[data-mode="quiet"] .line-field input,
+:root[data-mode="quiet"] .chip-new input,
+:root[data-mode="quiet"] .chip,
+:root[data-mode="quiet"] .pin-note .text-button {
+  color: var(--text);
+  border-color: var(--rule);
+}
+
+:root[data-mode="quiet"] .line-field input::placeholder,
+:root[data-mode="quiet"] .chip-new input::placeholder {
+  color: var(--text-dim);
+}
+
+:root[data-mode="quiet"] .chip:has(input:checked) {
+  background: var(--text);
+  color: var(--bg);
+}
+
+:root[data-mode="quiet"] .pin-note__error {
+  background: transparent;
+  color: var(--pencil);
+  padding: 0;
+}
+
+:root[data-mode="quiet"] .empty-window {
+  transform: none;
+}

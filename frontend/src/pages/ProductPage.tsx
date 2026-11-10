@@ -1,35 +1,51 @@
 import { lazy, Suspense, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { LinerNotes } from "../components/LinerNotes";
+import { PencilCircle, PencilX } from "../components/Pencil";
 import { Price, RegularPriceNote } from "../components/Price";
-import { formatChange, formatDate, insight } from "../format";
-import type { PricePoint } from "../api";
-import { useCheckOne, useProduct, useRemoveProduct, useSetTarget, useStores } from "../hooks";
+import { ProductPhoto } from "../components/ProductPhoto";
+import { formatDate, insight } from "../format";
+import {
+  useCategories,
+  useCheckOne,
+  useProduct,
+  useRemoveProduct,
+  useSetTarget,
+  useStores,
+} from "../hooks";
+import { useMode } from "../mode";
+import { roomOf, windowState } from "../scene";
 
 // Observable Plot is the largest dependency, so load it only on this page.
 const PriceChart = lazy(() =>
   import("../components/PriceChart").then((m) => ({ default: m.PriceChart })),
 );
 
+/** One product, "inside the room". */
 export function ProductPage() {
   const id = Number(useParams().id);
   const { data: product, isLoading, error } = useProduct(id);
   const { data: stores = [] } = useStores();
+  const { data: categories = [] } = useCategories();
+  const { mode } = useMode();
   const check = useCheckOne();
   const remove = useRemoveProduct();
   const navigate = useNavigate();
 
-  if (isLoading) return <p className="status">Loading…</p>;
+  if (isLoading) return <p className="status">Opening the door…</p>;
   if (error || !product)
     return (
       <p className="status status--error">
-        This product isn't tracked any more. <Link to="/">See all products</Link>
+        This product isn't tracked any more. <Link to="/">Back to the building</Link>
       </p>
     );
 
   const s = product.summary;
   const storeName = stores.find((st) => st.key === product.store)?.name ?? product.store;
-  const unusual = new Set(product.anomalies.map((a) => a.checked_at));
+  const room = roomOf(categories, product);
+  const state = windowState(product, storeName);
+  const quiet = mode === "quiet";
 
   async function stopTracking() {
     if (!window.confirm(`Stop tracking ${product!.name}? Its price history will be deleted.`)) return;
@@ -38,114 +54,112 @@ export function ProductPage() {
   }
 
   return (
-    <article className="detail">
-      <Link className="back" to="/">
-        All products
+    <article className={`room room--${state.kind}`}>
+      <Link className="room__back text-button" to="/">
+        Back to the building
       </Link>
 
-      <header className="detail__header">
-        <div>
-          <h1 className="detail__name">{product.name}</h1>
-          <p className="detail__meta">
-            at {storeName}
-          </p>
+      <div className="room__stage">
+        <div className="room__window" aria-hidden="true">
+          {quiet ? (
+            <span className="room__poster-image">
+              <ProductPhoto src={product.image_url} hint={`${room?.name ?? ""} ${product.name}`} />
+              {state.kind === "fake" && <PencilX />}
+            </span>
+          ) : (
+            <span className="window window--big">
+              <span className="window__glass">
+                <ProductPhoto
+                  src={product.image_url}
+                  hint={`${room?.name ?? ""} ${product.name}`}
+                  className="window__photo"
+                />
+              </span>
+              <span className="curtain curtain--left" />
+              <span className="curtain curtain--right" />
+              {state.kind === "blocked" && <span className="blinds" />}
+            </span>
+          )}
         </div>
-        {s && (
-          <div className="detail__price">
-            <Price value={s.current} size="hero" />
-            <RegularPriceNote regular={product.regular_price} />
+
+        <div className="room__credits">
+          <p className="room__presents">{storeName} presents</p>
+          <h1 className="room__name">{product.name}</h1>
+          {room && <p className="room__where">{room.name.toLowerCase()}</p>}
+
+          {s && (
+            <div className="room__price paper paper--taped">
+              <span className="room__price-figure">
+                <Price value={s.current} size="hero" />
+                {quiet && state.kind === "deal" && <PencilCircle />}
+              </span>
+              <RegularPriceNote regular={product.regular_price} />
+            </div>
+          )}
+
+          <p className={quiet && (state.kind === "deal" || state.kind === "fake") ? "hand-note" : "room__state"}>
+            {quiet && state.kind === "fake" ? "fake sale, skip" : quiet && state.kind === "deal" ? `${state.words}!` : state.words}
+          </p>
+          <p className="room__insight">{insight(product)}</p>
+
+          <div className="room__actions">
+            <button
+              type="button"
+              className="paper-button paper-button--mustard"
+              onClick={() => check.mutate(product.id)}
+              disabled={check.isPending}
+            >
+              {check.isPending ? "Checking…" : "Check price now"}
+            </button>
+            <a className="paper-button" href={product.url} target="_blank" rel="noreferrer noopener">
+              Open at {storeName}
+            </a>
           </div>
-        )}
-      </header>
-
-      <p className={`detail__insight ${s?.fake_sale ? "is-warning" : ""}`}>{insight(product)}</p>
-
-      <div className="detail__actions">
-        <button
-          type="button"
-          className="button button--primary"
-          onClick={() => check.mutate(product.id)}
-          disabled={check.isPending}
-        >
-          {check.isPending ? "Checking…" : "Check price now"}
-        </button>
-        <a className="button" href={product.url} target="_blank" rel="noreferrer noopener">
-          Open in {storeName}
-        </a>
-        <button type="button" className="button button--quiet" onClick={stopTracking}>
-          Stop tracking
-        </button>
+          {check.data && !check.data.ok && (
+            <p className="room__error" role="alert">
+              {check.data.error}
+            </p>
+          )}
+          {check.data?.ok && (
+            <p className="room__checked" role="status">
+              Checked just now.
+            </p>
+          )}
+        </div>
       </div>
-      {check.data && !check.data.ok && (
-        <p className="status status--error" role="alert">
-          {check.data.error}
-        </p>
-      )}
-
-      {product.history.length > 1 ? (
-        <Suspense fallback={<div className="chart__canvas" />}>
-          <PriceChart
-            history={product.history}
-            anomalies={product.anomalies}
-            target={product.target_price}
-          />
-        </Suspense>
-      ) : (
-        <p className="status">The chart appears after the second price check.</p>
-      )}
 
       {s && (
         <dl className="facts">
           <Fact label="Lowest" value={s.lowest} note={formatDate(s.lowest_at)} />
           <Fact label="Highest" value={s.highest} note={formatDate(s.highest_at)} />
           <Fact label="Lowest in 30 days" value={s.lowest_30d} />
-          <TargetFact id={product.id} target={product.target_price} />
+          <AlertFact id={product.id} target={product.target_price} />
         </dl>
       )}
 
-      {product.history.length > 0 && (
-        <section className="log" aria-labelledby="log-title">
-          <h2 id="log-title" className="log__title">
-            Every check
-          </h2>
-          <table className="log__table">
-            <thead>
-              <tr>
-                <th scope="col">Date</th>
-                <th scope="col">Price</th>
-                <th scope="col">Note</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...product.history].reverse().map((p, i, all) => {
-                const paid = (point: PricePoint) => point.member_price ?? point.price;
-                const before = all[i + 1] ? paid(all[i + 1]) : undefined;
-                const change = before ? ((paid(p) - before) / before) * 100 : 0;
-                return (
-                  <tr key={p.checked_at}>
-                    <td>{formatDate(p.checked_at)}</td>
-                    <td className="log__price">
-                      <Price value={p.member_price ?? p.price} />
-                    </td>
-                    <td className="log__note">
-                      {Math.abs(change) >= 0.05 && (
-                        <span className={change < 0 ? "is-down" : "is-up"}>{formatChange(change)}</span>
-                      )}
-                      {p.member_price !== null && (
-                        <span className="log__regular">
-                          Regular <Price value={p.price} />
-                        </span>
-                      )}
-                      {unusual.has(p.checked_at) && <span className="tag">Unusual rise</span>}
-                      {!p.in_stock && <span className="tag">Out of stock</span>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {product.history.length > 0 ? (
+        <section className="torn" aria-label="Price chart">
+          <Suspense fallback={<div className="chart__canvas" />}>
+            <PriceChart
+              history={product.history}
+              anomalies={product.anomalies}
+              target={product.target_price}
+            />
+          </Suspense>
         </section>
+      ) : (
+        <p className="status">The chart appears after the first price check.</p>
       )}
+
+      {product.history.length > 0 && (
+        <LinerNotes history={product.history} anomalies={product.anomalies} />
+      )}
+
+      <p className="room__stop">
+        <button type="button" className="text-button" onClick={stopTracking}>
+          Stop tracking
+        </button>
+      </p>
     </article>
   );
 }
@@ -162,7 +176,7 @@ function Fact({ label, value, note }: { label: string; value: number; note?: str
   );
 }
 
-function TargetFact({ id, target }: { id: number; target: number | null }) {
+function AlertFact({ id, target }: { id: number; target: number | null }) {
   const setTarget = useSetTarget();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(target ? String(target).replace(".", ",") : "");
@@ -182,12 +196,12 @@ function TargetFact({ id, target }: { id: number; target: number | null }) {
 
   return (
     <div className="fact">
-      <dt>Your target</dt>
+      <dt>Alert price</dt>
       <dd>
         {editing ? (
-          <form className="target-form" onSubmit={save}>
+          <form className="alert-form" onSubmit={save}>
             <input
-              aria-label="Target price"
+              aria-label="Alert price"
               inputMode="decimal"
               value={value}
               onChange={(e) => {
@@ -196,8 +210,8 @@ function TargetFact({ id, target }: { id: number; target: number | null }) {
               }}
               autoFocus
             />
-            <button className="button button--primary" type="submit">
-              Save target
+            <button className="paper-button paper-button--mustard" type="submit">
+              Save alert price
             </button>
             {error && (
               <span className="fact__error" role="alert">
@@ -208,8 +222,8 @@ function TargetFact({ id, target }: { id: number; target: number | null }) {
         ) : (
           <>
             {target ? <Price value={target} size="large" /> : <span className="fact__none">None set</span>}
-            <button type="button" className="link-button" onClick={() => setEditing(true)}>
-              {target ? "Change target" : "Set a target"}
+            <button type="button" className="text-button" onClick={() => setEditing(true)}>
+              {target ? "Change alert price" : "Set an alert price"}
             </button>
           </>
         )}

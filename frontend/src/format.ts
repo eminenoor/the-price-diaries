@@ -33,7 +33,7 @@ export function insight(product: Product): string {
   if (s.fake_sale)
     return "This discount follows a recent price rise, so it isn't really cheaper than before.";
   if (product.target_price !== null && s.current <= product.target_price)
-    return `Below your target of ${formatPrice(product.target_price)}. A good time to buy.`;
+    return `Below your alert price of ${formatPrice(product.target_price)}. A good time to buy.`;
   if (s.is_all_time_low && s.previous !== null) return "The lowest price since you started tracking.";
   if (s.current <= s.lowest_30d) return "The lowest price in the last 30 days.";
   if (s.change_pct !== null && s.change_pct > 0)

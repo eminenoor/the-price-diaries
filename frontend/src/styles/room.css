@@ -1,0 +1,455 @@
+/* ---------- Product page: inside the room ---------- */
+
+.room {
+  --chart-ink: var(--ink);
+  --chart-warn: var(--rouge);
+}
+
+:root[data-mode="quiet"] .room {
+  --chart-ink: var(--text);
+  --chart-warn: var(--pencil);
+}
+
+.room__back {
+  display: inline-block;
+  margin: var(--space-2) 0 var(--space-4);
+}
+
+/* Asymmetric: the window on the left, the credits on the right. */
+.room__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  align-items: center;
+  gap: var(--space-5);
+}
+
+@media (max-width: 760px) {
+  .room__stage {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+    text-align: center;
+  }
+  .room__window {
+    width: min(72%, 18rem);
+    margin: 0 auto;
+  }
+}
+
+.window--big {
+  border-width: 16px;
+  transform: rotate(-1.5deg);
+}
+
+/* Inside the room the curtains are open and the lamp is on. */
+.room .curtain {
+  --curtain: 13%;
+}
+
+.room .window__glass {
+  background: radial-gradient(
+    circle at 50% 30%,
+    var(--lamp-hot) 0,
+    var(--lamp) 32%,
+    var(--lamp-deep) 95%
+  );
+}
+
+.room .window--big {
+  box-shadow: 0 0 80px 8px var(--lamp-glow);
+}
+
+.room .silhouette {
+  fill: var(--silhouette);
+}
+
+.room--fake .window__glass {
+  background: radial-gradient(circle at 50% 30%, var(--rose) 0, var(--rose-deep) 95%);
+}
+
+.room--fake .window--big {
+  box-shadow: 0 0 80px 8px var(--rose-glow);
+}
+
+.room__credits {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .room__credits {
+    align-items: center;
+  }
+}
+
+/* Set like a record credit: "Gratis presents", then the name, huge. */
+.room__presents {
+  font-style: italic;
+  font-size: var(--step-1);
+}
+
+.room__name {
+  font-size: var(--step-4);
+  overflow-wrap: anywhere;
+}
+
+.room__where {
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+.room__price {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: var(--space-3) 0 var(--space-1);
+  padding: 0.35em 0.7em 0.5em;
+  background: var(--paper);
+  transform: rotate(1deg);
+}
+
+/* Mustard paper only for a good deal, red only for a fake sale. */
+.room--deal .room__price {
+  background: var(--mustard);
+}
+
+.room--fake .room__price {
+  background: var(--rouge);
+  color: var(--on-rouge);
+}
+
+.room__price-figure {
+  position: relative;
+}
+
+.room__state {
+  font-weight: 700;
+  font-size: var(--step-1);
+}
+
+.room__insight {
+  max-width: 46ch;
+  color: var(--text-dim);
+}
+
+.room__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 760px) {
+  .room__actions {
+    justify-content: center;
+  }
+}
+
+.room__error {
+  max-width: 46ch;
+  padding: 0.4em 0.8em;
+  background: var(--rouge);
+  color: var(--on-rouge);
+  font-weight: 700;
+}
+
+:root[data-mode="quiet"] .room__error {
+  background: transparent;
+  color: var(--pencil);
+  padding: 0;
+}
+
+.room__checked {
+  font-weight: 700;
+}
+
+.room__stop {
+  margin-top: var(--space-5);
+  text-align: center;
+}
+
+/* ---------- Facts: small paper strips ---------- */
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 var(--space-4);
+}
+
+.fact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 10rem;
+  padding: 0.6em 1em;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.fact:nth-child(odd) {
+  transform: rotate(-1deg);
+}
+
+.fact:nth-child(even) {
+  transform: rotate(1.2deg);
+}
+
+.fact dt {
+  font-weight: 700;
+  font-size: var(--step--1);
+}
+
+.fact dd {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  margin: 0;
+}
+
+.fact__note,
+.fact__none {
+  font-size: var(--step--1);
+}
+
+.fact .text-button {
+  color: var(--ink);
+  font-size: var(--step--1);
+}
+
+.alert-form {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.alert-form input {
+  width: 7rem;
+  padding: 0.3em 0.4em;
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+}
+
+.fact__error {
+  font-size: var(--step--1);
+  font-weight: 700;
+  color: var(--rouge);
+}
+
+:root[data-mode="quiet"] .fact {
+  background: transparent;
+  color: var(--text);
+  transform: none;
+  border: 2px solid var(--rule);
+}
+
+:root[data-mode="quiet"] .fact .text-button,
+:root[data-mode="quiet"] .alert-form input {
+  color: var(--text);
+  border-color: var(--rule);
+}
+
+:root[data-mode="quiet"] .fact__error {
+  color: var(--pencil);
+}
+
+/* ---------- The chart, on a torn paper strip ---------- */
+
+.torn {
+  margin: var(--space-5) 0;
+  padding: var(--space-5) var(--space-3) var(--space-4);
+  background: var(--paper);
+  color: var(--ink);
+  clip-path: polygon(
+    0 2.5%, 4% 0.5%, 9% 2%, 14% 0, 19% 2.2%, 25% 0.8%, 31% 2.6%, 37% 0.4%, 43% 2%, 49% 0.6%,
+    55% 2.4%, 61% 0.2%, 67% 2%, 73% 0.7%, 79% 2.5%, 85% 0.3%, 91% 2.1%, 96% 0.6%, 100% 2%,
+    100% 97.5%, 95% 99.4%, 89% 97.6%, 83% 100%, 77% 97.8%, 71% 99.5%, 65% 97.4%, 59% 99.7%,
+    53% 97.9%, 47% 99.4%, 41% 97.5%, 35% 99.8%, 29% 97.6%, 23% 99.3%, 17% 97.7%, 11% 100%,
+    5% 97.8%, 0 99.5%
+  );
+}
+
+:root[data-mode="quiet"] .torn {
+  clip-path: none;
+  background: transparent;
+  color: var(--text);
+  padding-inline: 0;
+  border-top: 2px solid var(--rule);
+  border-bottom: 2px solid var(--rule);
+}
+
+.chart {
+  margin: 0;
+}
+
+.chart__canvas {
+  min-height: 260px;
+}
+
+.chart__canvas svg {
+  max-width: 100%;
+  overflow: visible;
+}
+
+.chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1) var(--space-4);
+  margin-top: var(--space-2);
+  font-size: var(--step--1);
+  font-weight: 700;
+}
+
+/* ---------- Liner notes on a record sleeve ---------- */
+
+.sleeve {
+  position: relative;
+  max-width: 60rem;
+  margin: var(--space-5) auto 0;
+  padding-right: clamp(3rem, 20vw, 15rem); /* room for the record to peek out */
+}
+
+.sleeve__vinyl {
+  position: absolute;
+  top: var(--space-4);
+  right: 0;
+  width: min(28rem, 75%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 3px solid var(--groove);
+  background:
+    radial-gradient(circle, var(--vinyl) 0 2%, var(--mustard) 2.5% 16%, var(--vinyl) 16.5% 19%, transparent 19.5%),
+    repeating-radial-gradient(circle, var(--vinyl) 0 3px, var(--groove) 3px 4px);
+}
+
+.sleeve__cover {
+  position: relative;
+  padding: var(--space-4) var(--space-4) var(--space-4);
+  background: var(--paper);
+  color: var(--ink);
+  transform: rotate(-0.8deg);
+}
+
+.sleeve__title {
+  font-size: var(--step-3);
+}
+
+.sleeve__sub {
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+.sleeve .text-button {
+  color: var(--ink);
+}
+
+.sleeve__more {
+  margin-bottom: var(--space-2);
+}
+
+.tracks {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.track {
+  display: grid;
+  grid-template-columns: 3.2em 4.6em 6.5em minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.6em;
+  padding: 0.4em 0;
+  border-bottom: 1px dashed var(--ink);
+  font-size: 0.9375rem;
+}
+
+.track__no {
+  font-family: var(--font-title);
+  font-weight: 800;
+}
+
+.track__notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2em 0.8em;
+}
+
+.track__flag {
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .sleeve {
+    padding-right: 2.25rem;
+  }
+  .sleeve__cover {
+    padding: var(--space-3);
+  }
+  .track {
+    grid-template-columns: 2.6em 4.2em minmax(0, 1fr);
+  }
+  .track__notes {
+    grid-column: 2 / -1;
+  }
+}
+
+:root[data-mode="quiet"] .sleeve {
+  padding-right: 0;
+}
+
+:root[data-mode="quiet"] .sleeve__vinyl {
+  display: none;
+}
+
+:root[data-mode="quiet"] .sleeve__cover {
+  background: transparent;
+  color: var(--text);
+  transform: none;
+  padding-inline: 0;
+  border-top: 2px solid var(--rule);
+}
+
+:root[data-mode="quiet"] .sleeve .text-button {
+  color: var(--text);
+}
+
+:root[data-mode="quiet"] .track {
+  border-bottom: 2px solid var(--rule);
+}
+
+/* ---------- Quiet mode: the poster version ---------- */
+
+.room__poster-image {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  height: clamp(14rem, 40vw, 28rem);
+}
+
+.room__poster-image img,
+.room__poster-image svg.silhouette {
+  height: 100%;
+  max-width: 100%;
+}
+
+:root[data-mode="quiet"] .room .silhouette {
+  fill: var(--text);
+}
+
+:root[data-mode="quiet"] .room__price {
+  padding: 0;
+  margin-top: var(--space-2);
+}
+
+:root[data-mode="quiet"] .room__price .regular-note {
+  color: var(--text);
+}

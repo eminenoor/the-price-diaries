@@ -54,7 +54,7 @@ describe("insight", () => {
   });
 
   it("celebrates hitting the target", () => {
-    expect(insight(product({ target_price: 310 }))).toMatch(/Below your target/);
+    expect(insight(product({ target_price: 310 }))).toMatch(/Below your alert price/);
   });
 
   it("reports failed checks", () => {

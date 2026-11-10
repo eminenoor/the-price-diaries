@@ -1,119 +1,273 @@
-import { Link } from "react-router-dom";
+import type { CSSProperties } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
-import type { Product } from "../api";
-import { AddProductForm } from "../components/AddProductForm";
-import { Price, RegularPriceNote } from "../components/Price";
-import { Sparkline } from "../components/Sparkline";
-import { formatChange, insight, pickFeature } from "../format";
-import { useProducts, useStores } from "../hooks";
+import type { Category, Product } from "../api";
+import { NightWindow } from "../components/NightWindow";
+import { QuietItem } from "../components/QuietItem";
+import { useCategories, useProducts, useStores } from "../hooks";
+import { useMode } from "../mode";
+import { floorsOf, inkOn, newsLine, placement, roomOf, type Floor } from "../scene";
 
 export function IndexPage() {
-  const { data: products = [], isLoading, error } = useProducts();
-  const visible = products;
-  const feature = pickFeature(products);
+  const products = useProducts();
+  const categories = useCategories();
+  const storeName = useStoreName();
+  const [params] = useSearchParams();
+  const { mode } = useMode();
 
-  if (isLoading) return <p className="status">Loading your products…</p>;
-  if (error)
+  if (products.isLoading || categories.isLoading)
+    return <p className="status">Turning the lights on…</p>;
+  if (products.error || categories.error)
     return (
       <p className="status status--error">
         Can't reach the tracker. Start the backend with <code>uv run price-diaries serve</code>.
       </p>
     );
 
-  return (
-    <>
-      {feature?.summary ? <Feature product={feature} /> : <Welcome />}
-      <AddProductForm />
+  const all = products.data ?? [];
+  const cats = categories.data ?? [];
+  const floors = floorsOf(cats, all);
+  const chosen = floors.find((f) => f.floor && String(f.floor.id) === params.get("floor"));
+  const shown = chosen ? [chosen] : floors;
+  const shownProducts = shown.flatMap((f) => f.products);
 
-      {products.length > 0 && (
-        <section className="index" aria-labelledby="index-title">
-          <div className="index__head">
-            <h2 id="index-title" className="index__title">
-              Everything you're watching
-            </h2>
-          </div>
-          <ol className="rows">
-            {visible.map((p) => (
-              <ProductRow key={p.id} product={p} />
-            ))}
-          </ol>
-        </section>
-      )}
-    </>
+  if (all.length === 0) return <EmptyBuilding quiet={mode === "quiet"} />;
+
+  if (mode === "quiet")
+    return (
+      <div className="quiet">
+        <h1 className="poster-title">price diaries</h1>
+        <p className="poster-summary">{newsLine(shownProducts, storeName)}</p>
+        <FloorTabs floors={floors} current={chosen?.floor ?? null} />
+        {shown.map((f) => (
+          <QuietFloor
+            key={f.floor?.id ?? "none"}
+            floor={f}
+            categories={cats}
+            storeName={storeName}
+            labelled={!chosen}
+          />
+        ))}
+      </div>
+    );
+
+  return (
+    <div className="night">
+      <Masthead />
+      <FloorTabs floors={floors} current={chosen?.floor ?? null} />
+      <Headline floor={chosen?.floor ?? null} />
+
+      <div className="building">
+        {shown.map((f) => (
+          <FloorSection
+            key={f.floor?.id ?? "none"}
+            floor={f}
+            categories={cats}
+            storeName={storeName}
+            labelled={!chosen}
+          />
+        ))}
+      </div>
+
+      <p className="subtitle">
+        <span>{newsLine(shownProducts, storeName)}</span>
+      </p>
+    </div>
   );
 }
 
-function Feature({ product }: { product: Product }) {
-  const s = product.summary!;
-  const storeName = useStoreName(product.store);
+function Masthead() {
   return (
-    <section className="feature" aria-label="Best deal right now">
-      <div className="feature__copy">
-        <p className="feature__kicker">The best deal on your list today</p>
-        <h1 className="feature__name">
-          <Link to={`/products/${product.id}`}>{product.name}</Link>
-        </h1>
-        <p className="feature__meta">at {storeName}</p>
-        <p className="feature__insight">{insight(product)}</p>
-      </div>
-      <div className="feature__figure">
-        <Price value={s.current} size="hero" />
-        <RegularPriceNote regular={product.regular_price} />
-        <Sparkline
-          values={product.sparkline}
-          width={320}
-          height={72}
-          label={`Price trend for ${product.name}`}
-        />
-        <p className="feature__range">
-          It has been as high as <Price value={s.highest} />
+    <div className="masthead">
+      <h1 className="masthead__title">
+        <span className="masthead__the">the price</span>{" "}
+        <span className="masthead__diaries">diaries</span>
+      </h1>
+    </div>
+  );
+}
+
+function FloorTabs({ floors, current }: { floors: Floor[]; current: Category | null }) {
+  const named = floors.filter((f): f is Floor & { floor: Category } => f.floor !== null);
+  return (
+    <nav className="floor-tabs" aria-label="Floors">
+      <ul>
+        <li style={{ "--tilt": "-1.5deg" } as CSSProperties}>
+          <Link className="floor-tab" to="/" aria-current={current === null ? "page" : undefined}>
+            everything
+          </Link>
+        </li>
+        {named.map(({ floor, products }) => (
+          <li
+            key={floor.id}
+            style={
+              {
+                "--tilt": `${placement(floor.id).rotate * 0.7}deg`,
+                "--tape-angle": `${placement(floor.id).tape}deg`,
+                "--strip": floor.color,
+                "--strip-ink": inkOn(floor.color),
+              } as CSSProperties
+            }
+          >
+            <Link
+              className="floor-tab floor-tab--colored"
+              to={`/?floor=${floor.id}`}
+              aria-current={current?.id === floor.id ? "page" : undefined}
+            >
+              {floor.name.toLowerCase()}
+              <span className="floor-tab__count">
+                {products.length}
+                <span className="visually-hidden"> {products.length === 1 ? "product" : "products"}</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+/** "tonight on the ▯ skincare ▯ floor", with tiny lit windows between words. */
+function Headline({ floor }: { floor: Category | null }) {
+  const lit = <span className="tiny-window" aria-hidden="true" />;
+  return (
+    <h2 className="tonight">
+      {floor ? (
+        <>
+          tonight on the {lit} {floor.name.toLowerCase()} {lit} floor
+        </>
+      ) : (
+        <>
+          tonight in the {lit} whole {lit} building
+        </>
+      )}
+    </h2>
+  );
+}
+
+function FloorSection(props: {
+  floor: Floor;
+  categories: Category[];
+  storeName: (key: string) => string;
+  labelled: boolean;
+}) {
+  const { floor, products } = props.floor;
+  const id = `floor-${floor?.id ?? "none"}`;
+  const name = floor ? floor.name.toLowerCase() : "no floor yet";
+  return (
+    <section className="floor" aria-labelledby={id}>
+      <h3
+        id={id}
+        className={`floor__sign paper paper--taped ${props.labelled ? "" : "visually-hidden"}`}
+        style={
+          floor
+            ? ({ "--strip": floor.color, "--strip-ink": inkOn(floor.color) } as CSSProperties)
+            : undefined
+        }
+      >
+        {name}
+      </h3>
+      {products.length > 0 ? (
+        <ol className="windows">
+          {products.map((p: Product) => (
+            <NightWindow
+              key={p.id}
+              product={p}
+              storeName={props.storeName(p.store)}
+              room={roomOf(props.categories, p)}
+            />
+          ))}
+        </ol>
+      ) : (
+        <>
+          <DarkWindows count={3} />
+          <p className="floor__empty">No lights on this floor yet.</p>
+        </>
+      )}
+    </section>
+  );
+}
+
+function QuietFloor(props: {
+  floor: Floor;
+  categories: Category[];
+  storeName: (key: string) => string;
+  labelled: boolean;
+}) {
+  const { floor, products } = props.floor;
+  const id = `quiet-floor-${floor?.id ?? "none"}`;
+  return (
+    <section className="poster-floor" aria-labelledby={id}>
+      <h2 id={id} className={`poster-floor__name ${props.labelled ? "" : "visually-hidden"}`}>
+        {floor ? floor.name.toLowerCase() : "no floor yet"}
+      </h2>
+      {products.length > 0 ? (
+        <ol className="poster-list">
+          {products.map((p) => (
+            <QuietItem
+              key={p.id}
+              product={p}
+              storeName={props.storeName(p.store)}
+              room={roomOf(props.categories, p)}
+            />
+          ))}
+        </ol>
+      ) : (
+        <p className="poster-floor__empty">Nothing tracked on this floor yet.</p>
+      )}
+    </section>
+  );
+}
+
+/** Nothing tracked yet: the whole building is dark. */
+function EmptyBuilding({ quiet }: { quiet: boolean }) {
+  if (quiet)
+    return (
+      <div className="quiet">
+        <h1 className="poster-title">price diaries</h1>
+        <p className="poster-summary">Nothing tracked yet.</p>
+        <p className="empty-actions">
+          <Link className="paper-button" to="/add">
+            Pin a new window
+          </Link>
         </p>
       </div>
-    </section>
+    );
+  return (
+    <div className="night">
+      <Masthead />
+      <div className="building building--dark">
+        <DarkWindows count={8} />
+        <h2 className="tonight">no lights on yet</h2>
+        <p className="floor__empty">
+          Pin a product's window and its light comes on when the price is worth a look.
+        </p>
+        <p className="empty-actions">
+          <Link className="paper-button paper-button--mustard" to="/add">
+            Pin a new window
+          </Link>
+        </p>
+      </div>
+    </div>
   );
 }
 
-function Welcome() {
+/** Unlit windows, for empty floors and the empty building. Decorative. */
+function DarkWindows({ count }: { count: number }) {
   return (
-    <section className="feature feature--empty">
-      <h1 className="feature__name">Your price diary</h1>
-      <p className="feature__insight">
-        Paste a product link below. Its price is checked every morning and every check is kept, so
-        you can see when a "sale" isn&apos;t really one.
-      </p>
-    </section>
-  );
-}
-
-function ProductRow({ product }: { product: Product }) {
-  const s = product.summary;
-  const storeName = useStoreName(product.store);
-  const tone = !s ? "" : s.fake_sale ? "row--warning" : s.is_all_time_low ? "row--good" : "";
-  return (
-    <li className={`row ${tone}`}>
-      <Link className="row__link" to={`/products/${product.id}`}>
-        <span className="row__name">{product.name}</span>
-        <span className="row__store">
-          {storeName}
+    <div className="dark-windows" aria-hidden="true">
+      {Array.from({ length: count }, (_, i) => (
+        <span key={i} className="window window--unlit">
+          <span className="window__glass" />
+          <span className="curtain curtain--left" />
+          <span className="curtain curtain--right" />
         </span>
-      </Link>
-      <Sparkline values={product.sparkline} label={`Price trend for ${product.name}`} />
-      <span className="row__price">
-        {s ? <Price value={s.current} size="large" /> : <span className="row__pending">Not checked yet</span>}
-        <RegularPriceNote regular={product.regular_price} />
-        {s?.change_pct ? (
-          <span className={`row__change ${s.change_pct < 0 ? "is-down" : "is-up"}`}>
-            {formatChange(s.change_pct)}
-          </span>
-        ) : null}
-      </span>
-      <p className="row__insight">{insight(product)}</p>
-    </li>
+      ))}
+    </div>
   );
 }
 
-
-function useStoreName(key: string): string {
+function useStoreName(): (key: string) => string {
   const { data: stores = [] } = useStores();
-  return stores.find((s) => s.key === key)?.name ?? key;
+  return (key) => stores.find((s) => s.key === key)?.name ?? key;
 }

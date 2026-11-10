@@ -1,9 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, type NewProduct } from "./api";
+import { api, type NewCategory, type NewProduct } from "./api";
 
 export const useStores = () =>
   useQuery({ queryKey: ["stores"], queryFn: api.stores, staleTime: Infinity });
+
+export const useCategories = () => useQuery({ queryKey: ["categories"], queryFn: api.categories });
+
+export const useAddCategory = () => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: NewCategory) => api.createCategory(body),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["categories"] }),
+  });
+};
 
 export const useProducts = () => useQuery({ queryKey: ["products"], queryFn: api.products });
 

@@ -1,22 +1,25 @@
-import { Link, Route, Routes } from "react-router-dom";
+import { Link, Route, Routes, useLocation } from "react-router-dom";
 
 import { useCheckAll, useProducts } from "./hooks";
+import { useMode } from "./mode";
+import { AddPage } from "./pages/AddPage";
 import { IndexPage } from "./pages/IndexPage";
 import { ProductPage } from "./pages/ProductPage";
 
 export function App() {
   return (
     <div className="page">
-      <Masthead />
-      <main>
+      <TopBar />
+      <main id="main">
         <Routes>
           <Route path="/" element={<IndexPage />} />
+          <Route path="/add" element={<AddPage />} />
           <Route path="/products/:id" element={<ProductPage />} />
           <Route
             path="*"
             element={
               <p className="status">
-                Nothing here. <Link to="/">Back to your products</Link>
+                Nothing here. <Link to="/">Back to the building</Link>
               </p>
             }
           />
@@ -29,31 +32,42 @@ export function App() {
   );
 }
 
-function Masthead() {
+function TopBar() {
   const checkAll = useCheckAll();
   const { data: products = [] } = useProducts();
+  const { mode, setMode } = useMode();
+  const home = useLocation().pathname === "/";
   const failed = checkAll.data?.filter((r) => !r.ok).length ?? 0;
 
   return (
-    <header className="masthead">
-      <Link to="/" className="wordmark" aria-label="The Price Diaries, home">
+    <header className="topbar">
+      <Link to="/" className="topbar__home" aria-current={home ? "page" : undefined}>
         The Price Diaries
       </Link>
-      <p className="masthead__tagline">For the things you buy again</p>
-      <div className="masthead__actions">
+      <div className="topbar__actions">
+        <Link className="paper-button paper-button--mustard" to="/add">
+          Pin a new window
+        </Link>
         <button
           type="button"
-          className="button"
+          className="paper-button"
           onClick={() => checkAll.mutate()}
           disabled={checkAll.isPending || products.length === 0}
         >
           {checkAll.isPending ? "Checking all prices…" : "Check all prices now"}
         </button>
         {checkAll.isSuccess && (
-          <span className="masthead__result" role="status">
+          <span className="topbar__result" role="status">
             {failed === 0 ? "All prices updated" : `${failed} couldn't be checked`}
           </span>
         )}
+        <button
+          type="button"
+          className="mode-toggle"
+          onClick={() => setMode(mode === "night" ? "quiet" : "night")}
+        >
+          {mode === "night" ? "Switch to quiet mode" : "Switch to night view"}
+        </button>
       </div>
     </header>
   );
