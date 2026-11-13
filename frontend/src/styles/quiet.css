@@ -162,6 +162,10 @@
   font-size: var(--step--1);
 }
 
+.poster-item__unit {
+  display: block;
+}
+
 .poster-item__words {
   font-weight: 700;
 }

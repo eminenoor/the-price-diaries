@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PricePoint, ProductDetail } from "../api";
 import { ModeProvider } from "../mode";
+import { expectUnitPrice } from "../test-utils";
 import { ProductPage } from "./ProductPage";
 
 const point = (checked_at: string, price: number, member_price: number | null = null): PricePoint => ({
@@ -40,6 +41,8 @@ export const detail = (overrides: Partial<ProductDetail> = {}): ProductDetail =>
     fake_sale: false,
   },
   regular_price: null,
+  size: null,
+  unit_price: null,
   sparkline: [],
   history: [
     point("2026-11-05T09:17:00", 320),
@@ -214,5 +217,58 @@ describe("ProductPage credit", () => {
     await waitFor(() =>
       expect(calls).toContainEqual({ method: "PATCH", path: "/products/7", body: { brand: "" } }),
     );
+  });
+});
+
+describe("ProductPage size", () => {
+  const sized = (): Partial<ProductDetail> => ({
+    size: { amount: 150, unit: "ml", source: "name" },
+    unit_price: { price: 17.88, per: 10, unit: "ml" },
+  });
+
+  it("writes the price per 10 ml under the price, and the size", async () => {
+    renderProduct(detail(sized()));
+    expect(await screen.findByText("Size 150 ml")).toBeInTheDocument();
+    expectUnitPrice(document.querySelector(".room__price .unit-price"), "17,88", "10 ml");
+  });
+
+  it("changes the size as typed, with a decimal comma", async () => {
+    const calls = renderProduct(detail(sized()));
+    fireEvent.click(await screen.findByRole("button", { name: "Change size" }));
+    const input = screen.getByRole("textbox", { name: "Size" });
+    expect(input).toHaveValue("150 ml");
+    fireEvent.change(input, { target: { value: "1,5 L" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save size" }));
+    await waitFor(() =>
+      expect(calls).toContainEqual({ method: "PATCH", path: "/products/7", body: { size: "1,5 L" } }),
+    );
+  });
+
+  it("offers to add a size when there is none, and to remove one", async () => {
+    const calls = renderProduct(detail());
+    fireEvent.click(await screen.findByRole("button", { name: "Add the size" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove size" }));
+    await waitFor(() =>
+      expect(calls).toContainEqual({ method: "PATCH", path: "/products/7", body: { size: "" } }),
+    );
+  });
+
+  it("says why a size wasn't saved", async () => {
+    renderProduct(detail(sized()));
+    fireEvent.click(await screen.findByRole("button", { name: "Change size" }));
+    const message = "Write the size with a unit, like 150 ml, 1,5 L, 500 g or 60 adet.";
+    const ok = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+        init?.method === "PATCH"
+          ? new Response(JSON.stringify({ detail: message }), { status: 422 })
+          : ok(input, init),
+      ),
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Size" }), { target: { value: "150" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save size" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(screen.getByRole("textbox", { name: "Size" })).toBeInTheDocument();
   });
 });

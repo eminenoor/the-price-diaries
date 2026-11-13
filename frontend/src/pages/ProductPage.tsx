@@ -1,18 +1,20 @@
 import { lazy, Suspense, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import type { Size } from "../api";
 import { LinerNotes } from "../components/LinerNotes";
 import { PencilCircle, PencilX } from "../components/Pencil";
-import { Price, RegularPriceNote } from "../components/Price";
+import { Price, RegularPriceNote, UnitPrice } from "../components/Price";
 import { ProductPhoto } from "../components/ProductPhoto";
 import { WindowDrawing } from "../components/WindowDrawing";
-import { insight } from "../format";
+import { formatSize, insight } from "../format";
 import {
   useCategories,
   useCheckOne,
   useProduct,
   useRemoveProduct,
   useSetBrand,
+  useSetSize,
   useSetTarget,
   useStores,
 } from "../hooks";
@@ -89,6 +91,7 @@ export function ProductPage() {
                 {quiet && state.kind === "deal" && <PencilCircle />}
               </span>
               <RegularPriceNote regular={product.regular_price} />
+              <UnitPrice unit={product.unit_price} />
             </div>
           )}
 
@@ -152,6 +155,7 @@ export function ProductPage() {
           showValue={product.history.length < 2}
         />
         <BrandEditor id={product.id} brand={product.brand} />
+        <SizeEditor id={product.id} size={product.size} />
         <p className="room__stop">
           <button type="button" className="text-button" onClick={stopTracking}>
             Stop tracking
@@ -199,6 +203,72 @@ function BrandEditor({ id, brand }: { id: number; brand: string | null }) {
       <button type="button" className="text-button" onClick={() => setEditing(false)}>
         Cancel
       </button>
+    </form>
+  );
+}
+
+/**
+ * The pack size is read from the name or the store page, which can be wrong, so it can be
+ * changed. The backend reads what's typed the same way it reads names ("1,5 L", "60 adet").
+ */
+function SizeEditor({ id, size }: { id: number; size: Size | null }) {
+  const setSize = useSetSize();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    try {
+      await setSize.mutateAsync({ id, size: value.trim() });
+      setEditing(false);
+    } catch {
+      // The error is shown below the form.
+    }
+  }
+
+  if (!editing)
+    return (
+      <span className="edit-row__item">
+        {size && <span>Size {formatSize(size)}</span>}
+        <button
+          type="button"
+          className="text-button"
+          onClick={() => {
+            setValue(size ? formatSize(size) : "");
+            setSize.reset();
+            setEditing(true);
+          }}
+        >
+          {size ? "Change size" : "Add the size"}
+        </button>
+      </span>
+    );
+  return (
+    <form className="edit-form" onSubmit={save}>
+      <label>
+        Size
+        <input
+          value={value}
+          maxLength={50}
+          placeholder="150 ml"
+          onChange={(e) => {
+            setValue(e.target.value);
+            setSize.reset();
+          }}
+          autoFocus
+        />
+      </label>
+      <button className="paper-button paper-button--mustard" type="submit" disabled={setSize.isPending}>
+        {value.trim() ? "Save size" : "Remove size"}
+      </button>
+      <button type="button" className="text-button" onClick={() => setEditing(false)}>
+        Cancel
+      </button>
+      {setSize.error && (
+        <span className="edit-form__error" role="alert">
+          {setSize.error.message}
+        </span>
+      )}
     </form>
   );
 }

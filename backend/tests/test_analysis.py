@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from price_diaries.analysis import is_fake_sale, summarize
+from price_diaries.analysis import UnitPrice, is_fake_sale, summarize, unit_price
 
 START = datetime(2026, 1, 1, 9)
 
@@ -71,3 +71,38 @@ def test_too_little_history():
     from price_diaries.analysis import price_anomalies
 
     assert price_anomalies(series(300, 400)) == []
+
+
+def test_unit_price_per_10_ml():
+    # ₺379,50 for 150 ml -> ₺25,30 per 10 ml
+    assert unit_price(379.5, 150, "ml") == UnitPrice(25.3, 10, "ml")
+
+
+def test_unit_price_per_100_g():
+    # ₺62 for 500 g -> ₺12,40 per 100 g
+    assert unit_price(62, 500, "g") == UnitPrice(12.4, 100, "g")
+
+
+def test_unit_price_per_piece():
+    assert unit_price(499, 60, "pcs") == UnitPrice(8.32, 1, "pcs")
+
+
+def test_unit_price_of_a_big_pack_is_rounded_to_kurus():
+    # ₺253 for 1 L -> ₺2,53 per 10 ml
+    assert unit_price(253, 1000, "ml") == UnitPrice(2.53, 10, "ml")
+    assert unit_price(100, 3000, "ml") == UnitPrice(0.33, 10, "ml")
+
+
+def test_bigger_pack_with_same_price_per_ml_compares_equal():
+    assert unit_price(150, 250, "ml") == unit_price(600, 1000, "ml")
+
+
+def test_no_unit_price_without_a_usable_size():
+    assert unit_price(100, 0, "ml") is None
+    assert unit_price(100, -5, "g") is None
+    assert unit_price(100, 50, "oz") is None
+
+
+def test_unit_price_rounds_half_a_kurus_up():
+    # 289,90 / 200 ml * 10 = 14,495
+    assert unit_price(289.9, 200, "ml") == UnitPrice(14.5, 10, "ml")

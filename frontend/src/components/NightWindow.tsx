@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import type { Category, Product } from "../api";
 import { placement, windowState } from "../scene";
-import { Price } from "./Price";
+import { Price, UnitPrice } from "./Price";
 import { WindowDrawing } from "./WindowDrawing";
 
 interface NightWindowProps {
@@ -60,6 +60,7 @@ export function NightWindow({ product, storeName, room }: NightWindowProps) {
               {s && product.regular_price !== null && (
                 <span className="label__card">card price</span>
               )}
+              {s && <UnitPrice unit={product.unit_price} className="label__unit" />}
               <span className="label__words">{state.words}</span>
             </span>
           )}

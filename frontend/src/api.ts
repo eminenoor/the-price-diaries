@@ -34,6 +34,24 @@ export interface Summary {
   fake_sale: boolean;
 }
 
+/** Millilitres, grams or pieces. */
+export type SizeUnit = "ml" | "g" | "pcs";
+
+/** A product's pack size, normalised: 1,5 L is { amount: 1500, unit: "ml" }. */
+export interface Size {
+  amount: number;
+  unit: SizeUnit;
+  /** Read from the product's name, the store page, or set by the user. */
+  source: "name" | "page" | "user";
+}
+
+/** The current price (the card price when shown) for `per` of `unit`: ₺2,53 / 10 ml. */
+export interface UnitPrice {
+  price: number;
+  per: number;
+  unit: SizeUnit;
+}
+
 export interface Product {
   id: number;
   url: string;
@@ -54,6 +72,10 @@ export interface Product {
   /** Latest shelf price, set only when the main price shown is a member price. */
   regular_price: number | null;
   sparkline: number[];
+  /** Pack size, or null if unknown. */
+  size: Size | null;
+  /** Null without a size or a price. */
+  unit_price: UnitPrice | null;
 }
 
 export interface PricePoint {
@@ -90,9 +112,11 @@ export interface NewProduct {
   target_price?: number;
 }
 
-/** Fields that can be changed later. brand "" removes it, so checks won't fill it in. */
+/** Fields that can be changed later. */
 export interface ProductChanges extends Partial<NewProduct> {
   brand?: string;
+  /** As written on the pack: "150 ml", "1,5 L". "" removes it, so checks won't fill it in. */
+  size?: string;
 }
 
 export class ApiError extends Error {

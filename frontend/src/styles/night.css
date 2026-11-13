@@ -412,6 +412,10 @@
   font-size: var(--step--1);
 }
 
+.label__unit {
+  flex-basis: 100%; /* its own line, under the price */
+}
+
 .spot--deal .label--price {
   background: var(--mustard);
 }

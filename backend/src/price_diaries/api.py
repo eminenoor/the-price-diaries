@@ -16,11 +16,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from price_diaries import migrate
-from price_diaries.analysis import price_anomalies, summarize
-from price_diaries.checker import check_all, check_product
+from price_diaries.analysis import price_anomalies, summarize, unit_price
+from price_diaries.checker import check_all, check_product, update_size
 from price_diaries.db import Category, Database, Product
 from price_diaries.fetcher import Fetcher
-from price_diaries.parsers import STORES
+from price_diaries.parsers import STORES, parse_size
 from price_diaries.scheduler import build_scheduler
 from price_diaries.schemas import (
     AnomalyOut,
@@ -33,8 +33,10 @@ from price_diaries.schemas import (
     ProductDetail,
     ProductOut,
     ProductUpdate,
+    SizeOut,
     StoreOut,
     Summary,
+    UnitPriceOut,
 )
 from price_diaries.security import UnsupportedURLError, validate_product_url
 from price_diaries.settings import Settings, get_settings
@@ -151,6 +153,14 @@ def _to_out(product: Product, use_member: bool) -> ProductOut:
     summary = summarize(history)
     latest = product.prices[-1] if product.prices else None
     shows_member = bool(latest and use_member and latest.member_price is not None)
+    size = per_unit = None
+    if product.size_amount is not None and product.size_unit is not None:
+        size = SizeOut(
+            amount=product.size_amount, unit=product.size_unit, source=product.size_source
+        )
+        if summary is not None:
+            found = unit_price(summary.current, product.size_amount, product.size_unit)
+            per_unit = UnitPriceOut(**vars(found)) if found else None
     return ProductOut(
         id=product.id,
         url=product.url,
@@ -166,6 +176,8 @@ def _to_out(product: Product, use_member: bool) -> ProductOut:
         summary=Summary(**vars(summary)) if summary else None,
         regular_price=latest.price if shows_member else None,
         sparkline=[price for _, price in history[-30:]],
+        size=size,
+        unit_price=per_unit,
     )
 
 
@@ -255,6 +267,7 @@ def _register_routes(app: FastAPI) -> None:
             target_price=body.target_price,
             selector=body.selector,
         )
+        update_size(product)
         session.add(product)
         try:
             session.commit()
@@ -278,8 +291,22 @@ def _register_routes(app: FastAPI) -> None:
         if "brand" in changes:
             # A blank brand is kept as "", so the next check doesn't fill it in again.
             changes["brand"] = " ".join((changes["brand"] or "").split())
+        size_text = (changes.pop("size", None) or "").strip()
+        if "size" in body.model_fields_set:
+            size = parse_size(size_text)
+            if size_text and size is None:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    "Write the size with a unit, like 150 ml, 1,5 L, 500 g or 60 adet.",
+                )
+            # Removing it is kept too (source "user"), so checks don't fill it in again.
+            product.size_amount = size.amount if size else None
+            product.size_unit = size.unit if size else None
+            product.size_source = "user"
         for field, value in changes.items():
             setattr(product, field, value)
+        if "name" in changes:
+            update_size(product)
         session.commit()
         return _to_out(product, settings.use_member_prices)
 

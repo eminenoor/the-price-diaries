@@ -60,6 +60,11 @@ class Product(Base):
     last_error: Mapped[str | None] = mapped_column(String(500))
     # The store refused the last check (403 or an "Access Denied" page).
     blocked: Mapped[bool] = mapped_column(default=False, server_default=false())
+    # Pack size in "ml", "g" or "pcs", for the unit price. size_source says where it came
+    # from: "name", "page" or "user". Checks never change a size the user set or removed.
+    size_amount: Mapped[float | None] = mapped_column(Float)
+    size_unit: Mapped[str | None] = mapped_column(String(3))
+    size_source: Mapped[str | None] = mapped_column(String(4))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     prices: Mapped[list[PricePoint]] = relationship(

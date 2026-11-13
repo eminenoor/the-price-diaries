@@ -1,4 +1,4 @@
-import type { Product, Summary } from "./api";
+import type { Product, Size, SizeUnit, Summary } from "./api";
 
 const lira = new Intl.NumberFormat("tr-TR", {
   minimumFractionDigits: 2,
@@ -8,6 +8,21 @@ const lira = new Intl.NumberFormat("tr-TR", {
 /** 1299.9 -> "1.299,90" (Turkish grouping, the way stores print prices). */
 export function formatPrice(value: number): string {
   return lira.format(value);
+}
+
+const sizeNumber = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 });
+
+/** What a unit price is quoted for: "10 ml", "100 g", "piece". */
+export function formatBasis(per: number, unit: SizeUnit): string {
+  if (unit === "pcs") return per === 1 ? "piece" : `${per} pieces`;
+  return `${per} ${unit}`;
+}
+
+/** A pack size the way a pack prints it: "150 ml", "1,5 L", "2,5 kg", "60 pieces". */
+export function formatSize({ amount, unit }: Pick<Size, "amount" | "unit">): string {
+  if (unit === "pcs") return amount === 1 ? "1 piece" : `${sizeNumber.format(amount)} pieces`;
+  if (amount >= 1000) return `${sizeNumber.format(amount / 1000)} ${unit === "ml" ? "L" : "kg"}`;
+  return `${sizeNumber.format(amount)} ${unit}`;
 }
 
 const shortDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });

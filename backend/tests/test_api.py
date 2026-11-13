@@ -221,3 +221,85 @@ def test_brand_length_is_limited(client):
     product_id = add_product(client).json()["id"]
     response = client.patch(f"/api/products/{product_id}", json={"brand": "x" * 101})
     assert response.status_code == 422
+
+
+SIZE_PAGE = (
+    '<script type="application/ld+json">'
+    '{"@type": "Product", "size": "200 ml", "offers": {"price": "289.90", "priceCurrency": "TRY"}}'
+    "</script>"
+)
+
+
+def test_size_from_name_on_create(client):
+    product = add_product(client, name="Tonik 150 ml").json()
+    assert product["size"] == {"amount": 150, "unit": "ml", "source": "name"}
+    assert product["unit_price"] is None  # no price yet
+
+
+def test_unit_price_uses_current_price(client, fake_pages):
+    fake_pages[URL] = PAGE
+    product_id = add_product(client, name="Serum 30 ml").json()["id"]
+    client.post(f"/api/products/{product_id}/check")
+    # ₺289,90 for 30 ml -> ₺96,63 per 10 ml
+    product = client.get(f"/api/products/{product_id}").json()
+    assert product["unit_price"] == {"price": 96.63, "per": 10, "unit": "ml"}
+
+
+def test_unit_price_uses_member_price(client, fake_pages):
+    fake_pages[URL] = MEMBER_PAGE
+    product_id = add_product(client, name="Serum 30 ml").json()["id"]
+    client.post(f"/api/products/{product_id}/check")
+    # ₺149,90 card price for 30 ml -> ₺49,97 per 10 ml
+    assert client.get("/api/products").json()[0]["unit_price"]["price"] == 49.97
+
+
+def test_size_from_page_when_name_has_none(client, fake_pages):
+    fake_pages[URL] = SIZE_PAGE
+    product_id = add_product(client).json()["id"]
+    assert client.get(f"/api/products/{product_id}").json()["size"] is None
+    client.post("/api/check")
+    product = client.get(f"/api/products/{product_id}").json()
+    assert product["size"] == {"amount": 200, "unit": "ml", "source": "page"}
+    assert product["unit_price"] == {"price": 14.5, "per": 10, "unit": "ml"}
+
+
+def test_name_size_wins_over_page(client, fake_pages):
+    fake_pages[URL] = SIZE_PAGE
+    product_id = add_product(client, name="Serum 30 ml").json()["id"]
+    client.post(f"/api/products/{product_id}/check")
+    assert client.get(f"/api/products/{product_id}").json()["size"]["amount"] == 30
+
+
+def test_user_size_survives_checks(client, fake_pages):
+    fake_pages[URL] = SIZE_PAGE
+    product_id = add_product(client, name="Serum 30 ml").json()["id"]
+    updated = client.patch(f"/api/products/{product_id}", json={"size": "1,5 L"})
+    assert updated.json()["size"] == {"amount": 1500, "unit": "ml", "source": "user"}
+    client.post(f"/api/products/{product_id}/check")
+    assert client.get(f"/api/products/{product_id}").json()["size"]["amount"] == 1500
+
+
+def test_removed_size_stays_removed(client, fake_pages):
+    fake_pages[URL] = SIZE_PAGE
+    product_id = add_product(client, name="Serum 30 ml").json()["id"]
+    removed = client.patch(f"/api/products/{product_id}", json={"size": ""}).json()
+    assert removed["size"] is None
+    client.post(f"/api/products/{product_id}/check")
+    product = client.get(f"/api/products/{product_id}").json()
+    assert product["size"] is None
+    assert product["unit_price"] is None
+
+
+def test_size_without_unit_is_rejected(client):
+    product_id = add_product(client).json()["id"]
+    response = client.patch(f"/api/products/{product_id}", json={"size": "150"})
+    assert response.status_code == 422
+    assert "150 ml" in response.json()["detail"]
+
+
+def test_renaming_rereads_the_size(client):
+    product_id = add_product(client, name="Serum 30 ml").json()["id"]
+    renamed = client.patch(f"/api/products/{product_id}", json={"name": "Serum 50 ml"}).json()
+    assert renamed["size"]["amount"] == 50
+    renamed = client.patch(f"/api/products/{product_id}", json={"name": "Serum"}).json()
+    assert renamed["size"] is None

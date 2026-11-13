@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import type { Product, Summary } from "./api";
-import { formatChange, formatCheck, formatPrice, insight, pickFeature } from "./format";
+import {
+  formatBasis,
+  formatChange,
+  formatCheck,
+  formatPrice,
+  formatSize,
+  insight,
+  pickFeature,
+} from "./format";
 
 const summary = (overrides: Partial<Summary> = {}): Summary => ({
   current: 300,
@@ -30,6 +38,8 @@ const product = (overrides: Partial<Product> = {}): Product => ({
   created_at: "2026-09-01T09:00:00",
   summary: summary(),
   regular_price: null,
+  size: null,
+  unit_price: null,
   sparkline: [],
   brand: null,
   ...overrides,
@@ -38,6 +48,25 @@ const product = (overrides: Partial<Product> = {}): Product => ({
 describe("formatPrice", () => {
   it("uses Turkish grouping and decimal comma", () => {
     expect(formatPrice(1299.9)).toBe("1.299,90");
+  });
+});
+
+describe("formatBasis", () => {
+  it("says what a unit price is for", () => {
+    expect(formatBasis(10, "ml")).toBe("10 ml");
+    expect(formatBasis(100, "g")).toBe("100 g");
+    expect(formatBasis(1, "pcs")).toBe("piece");
+  });
+});
+
+describe("formatSize", () => {
+  it("writes a size the way a pack prints it", () => {
+    expect(formatSize({ amount: 150, unit: "ml" })).toBe("150 ml");
+    expect(formatSize({ amount: 1500, unit: "ml" })).toBe("1,5 L");
+    expect(formatSize({ amount: 1000, unit: "g" })).toBe("1 kg");
+    expect(formatSize({ amount: 2500, unit: "g" })).toBe("2,5 kg");
+    expect(formatSize({ amount: 60, unit: "pcs" })).toBe("60 pieces");
+    expect(formatSize({ amount: 1, unit: "pcs" })).toBe("1 piece");
   });
 });
 

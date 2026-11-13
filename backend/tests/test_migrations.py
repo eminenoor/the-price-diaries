@@ -64,3 +64,22 @@ def test_category_text_becomes_rooms_on_skincare(tmp_path):
     with engine.connect() as conn:
         names = conn.execute(text("SELECT category FROM products ORDER BY id")).scalars()
         assert list(names) == ["Toner", "Toner", "Serum", None]
+
+
+def test_existing_products_get_a_size_from_their_name(tmp_path):
+    url = f"sqlite:///{tmp_path / 's.db'}"
+    migrate.upgrade(url, "0006")
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        for i, name in enumerate(["Tonik 150 ml", "Serum"]):
+            conn.execute(
+                text("INSERT INTO products (url, name, store) VALUES (:u, :n, 'gratis')"),
+                {"u": f"https://www.gratis.com/p-{i}", "n": name},
+            )
+
+    migrate.upgrade(url)
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT size_amount, size_unit, size_source FROM products ORDER BY id")
+        ).all()
+    assert [tuple(r) for r in rows] == [(150, "ml", "name"), (None, None, None)]

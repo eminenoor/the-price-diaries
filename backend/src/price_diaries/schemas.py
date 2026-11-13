@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -52,6 +53,28 @@ class ProductUpdate(BaseModel):
     category_id: int | None = None
     target_price: float | None = Field(default=None, gt=0)
     selector: str | None = Field(default=None, max_length=300)
+    size: str | None = Field(
+        default=None,
+        max_length=50,
+        examples=["150 ml", "1,5 L", "500 g", "60 adet"],
+        description='The pack size as written on the pack. "" or null removes it; '
+        "checks won't fill it in again.",
+    )
+
+
+SizeUnit = Literal["ml", "g", "pcs"]
+
+
+class SizeOut(BaseModel):
+    amount: float = Field(description="In millilitres, grams or pieces.")
+    unit: SizeUnit
+    source: Literal["name", "page", "user"]
+
+
+class UnitPriceOut(BaseModel):
+    price: float = Field(description="The price of `per` of `unit`, e.g. 2.53 for 10 ml.")
+    per: int
+    unit: SizeUnit
 
 
 class Summary(BaseModel):
@@ -86,6 +109,10 @@ class ProductOut(BaseModel):
         default=None, description="Latest shelf price, when a member price is shown instead."
     )
     sparkline: list[float] = Field(description="Up to the last 30 prices, oldest first.")
+    size: SizeOut | None = Field(default=None, description="Pack size, if known.")
+    unit_price: UnitPriceOut | None = Field(
+        default=None, description="Current price (the card price when shown) per unit of size."
+    )
 
 
 class PricePointOut(BaseModel):

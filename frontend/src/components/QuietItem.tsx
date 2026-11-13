@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import type { Category, Product } from "../api";
 import { windowState } from "../scene";
 import { PencilCircle, PencilX } from "./Pencil";
-import { Price } from "./Price";
+import { Price, UnitPrice } from "./Price";
 import { ProductPhoto } from "./ProductPhoto";
 
 interface QuietItemProps {
@@ -40,6 +40,7 @@ export function QuietItem({ product, storeName, room }: QuietItemProps) {
           {s && product.regular_price !== null && (
             <span className="poster-item__card">card price</span>
           )}
+          {s && <UnitPrice unit={product.unit_price} className="poster-item__unit" />}
           <span className={marked ? "hand-note" : "poster-item__words"}>
             {state.kind === "deal" ? `${state.words}!` : state.kind === "fake" ? "fake sale, skip" : state.words}
           </span>

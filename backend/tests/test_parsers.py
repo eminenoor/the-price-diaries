@@ -1,6 +1,6 @@
 import pytest
 
-from price_diaries.parsers import Parser, PriceNotFoundError, store_for_host
+from price_diaries.parsers import Parser, PriceNotFoundError, Size, store_for_host
 
 JSON_LD_PAGE = """
 <html><head>
@@ -219,3 +219,30 @@ def test_product_brand(html, expected):
 def test_overlong_brand_is_ignored():
     html = f'<meta property="product:brand" content="{"x" * 101}">' + META_PAGE
     assert Parser().parse(html).brand is None
+
+
+def _product_ld(fields: str) -> str:
+    return (
+        '<script type="application/ld+json">{"@type": "Product", '
+        + fields
+        + ', "offers": {"price": "99.90", "priceCurrency": "TRY"}}</script>'
+    )
+
+
+@pytest.mark.parametrize(
+    ("html", "expected"),
+    [
+        (_product_ld('"size": "150 ml"'), Size(150, "ml")),
+        (_product_ld('"weight": {"value": 1.5, "unitCode": "KGM"}'), Size(1500, "g")),
+        (_product_ld('"weight": {"value": "500", "unitText": "gr"}'), Size(500, "g")),
+        (_product_ld('"name": "Tonik 200 ML"'), Size(200, "ml")),
+        (_product_ld('"size": "Büyük", "name": "Şampuan 1,5 L"'), Size(1500, "ml")),
+        (
+            '<meta property="og:title" content="Bulaşık Tableti 60 Adet">' + META_PAGE,
+            Size(60, "pcs"),
+        ),
+        (JSON_LD_PAGE, None),
+    ],
+)
+def test_product_size(html, expected):
+    assert Parser().parse(html).size == expected

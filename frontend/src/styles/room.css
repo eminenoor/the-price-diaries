@@ -438,6 +438,11 @@
   margin-top: var(--space-2);
 }
 
-:root[data-mode="quiet"] .room__price .regular-note {
+:root[data-mode="quiet"] .room__price .unit-price {
+  margin-top: 0.3rem; /* clear of the pencil circle around a good deal */
+}
+
+:root[data-mode="quiet"] .room__price .regular-note,
+:root[data-mode="quiet"] .room__price .unit-price {
   color: var(--text);
 }

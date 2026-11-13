@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Category, Product } from "../api";
 import { ModeProvider } from "../mode";
+import { expectUnitPrice } from "../test-utils";
 import { IndexPage } from "./IndexPage";
 
 const CATEGORIES: Category[] = [
@@ -22,6 +23,8 @@ const base = {
   blocked: false,
   created_at: "2026-09-01T09:00:00",
   regular_price: null,
+  size: null,
+  unit_price: null,
   sparkline: [],
   brand: null,
 };
@@ -143,5 +146,32 @@ describe("IndexPage states", () => {
     expect(document.querySelector(".poster-summary")).toHaveTextContent(
       "Zinc toner is at its lowest ever at Gratis.",
     );
+  });
+});
+
+describe("IndexPage unit prices", () => {
+  const sized = PRODUCTS.map((p) =>
+    p.id === 3
+      ? {
+          ...p,
+          size: { amount: 150, unit: "ml" as const, source: "name" as const },
+          unit_price: { price: 25.3, per: 10, unit: "ml" as const },
+        }
+      : p,
+  );
+
+  it("writes the price per 10 ml under the price in night view", async () => {
+    renderIndex(sized);
+    const link = await screen.findByRole("link", { name: /Zinc toner/ });
+    expectUnitPrice(link.querySelector(".unit-price"), "25,30", "10 ml");
+    // Without a size there's no unit price.
+    expect(screen.getByRole("link", { name: /Aloe toner/ }).querySelector(".unit-price")).toBeNull();
+  });
+
+  it("does the same in quiet mode", async () => {
+    localStorage.setItem("price-diaries:mode", "quiet");
+    renderIndex(sized);
+    const link = await screen.findByRole("link", { name: /Zinc toner/ });
+    expectUnitPrice(link.querySelector(".unit-price"), "25,30", "10 ml");
   });
 });

@@ -10,6 +10,7 @@ from typing import Any
 from bs4 import BeautifulSoup
 
 from price_diaries.parsers.price_text import detect_currency, parse_price
+from price_diaries.parsers.size_text import Size, parse_size
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,7 @@ class ParsedPrice:
     member_price: float | None = None  # loyalty-card price, e.g. Gratis Gold & Platinum
     image_url: str | None = None  # product photo (og:image or JSON-LD), https only
     brand: str | None = None  # JSON-LD Product.brand.name, or a brand meta tag
+    size: Size | None = None  # pack size from JSON-LD size/weight/name or og:title
 
 
 class PriceNotFoundError(LookupError):
@@ -49,7 +51,9 @@ class Parser:
                 member = _member_price(soup, self.member_labels)
                 if member is not None and member < result.price:
                     result = replace(result, member_price=member)
-                return replace(result, image_url=_image_url(soup), brand=_brand(soup))
+                return replace(
+                    result, image_url=_image_url(soup), brand=_brand(soup), size=_size(soup)
+                )
         raise PriceNotFoundError("No price found on page. Try adding a 'selector' for it.")
 
     def explain(self, html: str, selector: str | None = None) -> dict[str, float | None]:
@@ -233,6 +237,37 @@ def _brand(soup: BeautifulSoup) -> str | None:
             clean = " ".join(name.split())
             if clean and len(clean) <= BRAND_MAX_LENGTH:
                 return clean
+    return None
+
+
+# UN/CEFACT codes that schema.org QuantitativeValue.unitCode uses.
+_UNIT_CODES = {"MLT": "ml", "CLT": "cl", "LTR": "l", "GRM": "g", "KGM": "kg", "C62": "adet"}
+
+
+def _size(soup: BeautifulSoup) -> Size | None:
+    """The pack size: JSON-LD Product size, weight or name, then og:title."""
+    candidates: list[Any] = []
+    for tag in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(tag.string or "")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        for node in _walk(data):
+            if not _is_type(node, "Product"):
+                continue
+            for key in ("size", "weight"):
+                for value in _as_list(node.get(key)):
+                    if isinstance(value, dict):  # {"value": 150, "unitCode": "MLT"}
+                        unit = value.get("unitText") or _UNIT_CODES.get(value.get("unitCode"))
+                        value = f"{value.get('value')} {unit}" if unit else value.get("name")
+                    candidates.append(value)
+            candidates.append(node.get("name"))
+    title = soup.find("meta", attrs={"property": "og:title"})
+    if title is not None:
+        candidates.append(title.get("content"))
+    for text in candidates:
+        if isinstance(text, str) and (size := parse_size(text)):
+            return size
     return None
 
 

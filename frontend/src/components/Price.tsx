@@ -1,4 +1,5 @@
-import { formatPrice } from "../format";
+import type { UnitPrice as UnitPriceData } from "../api";
+import { formatBasis, formatPrice } from "../format";
 
 interface PriceProps {
   value: number;
@@ -23,6 +24,22 @@ export function Price({ value, size = "row", className = "" }: PriceProps) {
       <span className="price__kurus" aria-hidden="true">
         ,{kurus}
       </span>
+    </span>
+  );
+}
+
+/**
+ * "₺2,53 / 10 ml" under a price, so different pack sizes compare. Screen readers
+ * hear "2,53 lira per 10 ml". Nothing when the size or the price is unknown.
+ */
+export function UnitPrice({ unit, className = "" }: { unit: UnitPriceData | null; className?: string }) {
+  if (unit === null) return null;
+  return (
+    <span className={`unit-price ${className}`}>
+      <Price value={unit.price} />
+      <span aria-hidden="true"> / </span>
+      <span className="visually-hidden"> per </span>
+      {formatBasis(unit.per, unit.unit)}
     </span>
   );
 }

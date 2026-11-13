@@ -17,6 +17,7 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from price_diaries.checker import update_size
 from price_diaries.db import Category, PricePoint, Product
 from price_diaries.fetcher import StoreBlockedError
 
@@ -169,6 +170,7 @@ def seed_demo(session: Session, days: int = 90, seed: int = 7) -> int:
             target_price=round(demo.base * 0.85),
             brand=demo.brand,
         )
+        update_size(product)  # from the name, like a new product
         if demo.ending == "blocked":
             error = StoreBlockedError(f"www.{demo.store}.com.tr", 403)
             product.last_error, product.blocked = str(error), True

@@ -40,3 +40,6 @@ export const useSetTarget = () =>
   useInvalidating(({ id, target }: { id: number; target: number }) =>
     api.update(id, { target_price: target }),
   );
+/** size "" removes the size; anything else is parsed by the backend ("1,5 L"). */
+export const useSetSize = () =>
+  useInvalidating(({ id, size }: { id: number; size: string }) => api.update(id, { size }));

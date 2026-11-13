@@ -201,6 +201,17 @@ code {
   font-size: var(--step--1);
 }
 
+/* "₺2,53 / 10 ml": a quiet second line under the main price. */
+.unit-price {
+  font-size: var(--step--1);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.unit-price .price {
+  font-size: 0.9375rem;
+}
+
 /* ---------- Paper: strips, notes and buttons ---------- */
 
 .paper {

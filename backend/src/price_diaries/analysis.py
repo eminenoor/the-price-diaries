@@ -6,6 +6,7 @@ import math
 import statistics
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 
 History = list[tuple[datetime, float]]  # sorted oldest -> newest
 
@@ -134,3 +135,26 @@ def is_fake_sale(
     dropped = current < peak
     not_really_cheaper = current >= base * (1 - tolerance)
     return raised and dropped and not_really_cheaper
+
+
+# How much of each unit the unit price is quoted for: "₺2,53 / 10 ml", "₺12,40 / 100 g",
+# "₺8,30 / piece". Fixed per unit, so every product in that unit compares directly.
+UNIT_BASIS: dict[str, int] = {"ml": 10, "g": 100, "pcs": 1}
+
+
+@dataclass(frozen=True)
+class UnitPrice:
+    price: float  # for `per` of `unit`
+    per: int
+    unit: str
+
+
+def unit_price(price: float, amount: float, unit: str) -> UnitPrice | None:
+    """The price of ``UNIT_BASIS[unit]`` units, for a pack of ``amount`` units at ``price``."""
+    per = UNIT_BASIS.get(unit)
+    if per is None or amount <= 0 or price < 0:
+        return None
+    # Decimal, so a half kuruş rounds up the way a shop would (14,495 -> 14,50); float
+    # rounding would give 14,49.
+    exact = Decimal(str(price)) / Decimal(str(amount)) * per
+    return UnitPrice(float(exact.quantize(Decimal("0.01"), ROUND_HALF_UP)), per, unit)
