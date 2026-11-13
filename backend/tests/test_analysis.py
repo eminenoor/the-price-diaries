@@ -1,6 +1,16 @@
 from datetime import datetime, timedelta
 
-from price_diaries.analysis import UnitPrice, is_fake_sale, summarize, unit_price
+from price_diaries.analysis import (
+    MIN_SAVING,
+    Offer,
+    UnitPrice,
+    cheaper_elsewhere,
+    is_fake_sale,
+    rank_offers,
+    saving,
+    summarize,
+    unit_price,
+)
 
 START = datetime(2026, 1, 1, 9)
 
@@ -106,3 +116,74 @@ def test_no_unit_price_without_a_usable_size():
 def test_unit_price_rounds_half_a_kurus_up():
     # 289,90 / 200 ml * 10 = 14,495
     assert unit_price(289.9, 200, "ml") == UnitPrice(14.5, 10, "ml")
+
+
+TODAY = START + timedelta(days=10)
+
+
+def offer(product_id, price, amount=None, unit=None, checked_at=TODAY, in_stock=True):
+    return Offer(product_id, price, checked_at, in_stock, amount, unit)
+
+
+def test_saving_for_the_same_pack():
+    assert saving(offer(1, 378.89, 150, "ml"), offer(2, 340, 150, "ml")) == 38.89
+
+
+def test_saving_is_negative_when_it_costs_more_there():
+    assert saving(offer(1, 340), offer(2, 378.89)) == -38.89
+
+
+def test_saving_scales_a_different_size_to_this_pack():
+    # 1,5 L for ₺165 is ₺275 for 2,5 L, so ₺14 less than ₺289.
+    assert saving(offer(1, 289, 2500, "ml"), offer(2, 165, 1500, "ml")) == 14
+    # The other way round, the big bottle is dearer for 1,5 L: 289 / 2500 * 1500 = 173,40.
+    assert saving(offer(2, 165, 1500, "ml"), offer(1, 289, 2500, "ml")) == -8.4
+
+
+def test_saving_assumes_the_same_pack_when_a_size_is_missing():
+    assert saving(offer(1, 300, 150, "ml"), offer(2, 280)) == 20
+
+
+def test_no_saving_between_different_units():
+    assert saving(offer(1, 300, 500, "g"), offer(2, 280, 500, "ml")) is None
+
+
+def test_rank_by_unit_price_when_every_size_is_known():
+    big = offer(1, 289, 2500, "ml")  # 11,56 per 100 ml
+    small = offer(2, 165, 1500, "ml")  # 11,00 per 100 ml
+    assert rank_offers([big, small]) == [small, big]
+
+
+def test_rank_by_price_when_a_size_is_missing():
+    big = offer(1, 289, 2500, "ml")
+    unknown = offer(2, 165)
+    assert rank_offers([big, unknown]) == [unknown, big]
+
+
+def test_rank_ties_go_to_the_latest_check():
+    old = offer(1, 100, checked_at=TODAY - timedelta(days=1))
+    new = offer(2, 100)
+    assert rank_offers([old, new]) == [new, old]
+
+
+def test_cheaper_elsewhere_picks_the_biggest_saving():
+    here = offer(1, 400)
+    best = offer(3, 340)
+    assert cheaper_elsewhere(here, [offer(2, 380), best], TODAY.date()) == (best, 60)
+
+
+def test_cheaper_elsewhere_only_counts_todays_checks_in_stock():
+    here = offer(1, 400)
+    stale = offer(2, 300, checked_at=TODAY - timedelta(days=1))
+    sold_out = offer(3, 300, in_stock=False)
+    assert cheaper_elsewhere(here, [stale, sold_out], TODAY.date()) is None
+
+
+def test_cheaper_elsewhere_ignores_tiny_savings_and_itself():
+    here = offer(1, 400)
+    tiny = offer(2, 400 - MIN_SAVING / 2)
+    assert cheaper_elsewhere(here, [here, tiny], TODAY.date()) is None
+
+
+def test_cheaper_elsewhere_skips_what_costs_more():
+    assert cheaper_elsewhere(offer(1, 300), [offer(2, 320)], TODAY.date()) is None

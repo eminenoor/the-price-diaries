@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import type { Category, Product } from "../api";
 import { placement, windowState } from "../scene";
+import { CheaperElsewhere } from "./Elsewhere";
 import { Price, UnitPrice } from "./Price";
 import { WindowDrawing } from "./WindowDrawing";
 
@@ -63,6 +64,9 @@ export function NightWindow({ product, storeName, room }: NightWindowProps) {
               {s && <UnitPrice unit={product.unit_price} className="label__unit" />}
               <span className="label__words">{state.words}</span>
             </span>
+          )}
+          {state.kind !== "blocked" && (
+            <CheaperElsewhere note={product.cheaper_elsewhere} className="paper label label--elsewhere" />
           )}
         </span>
       </Link>

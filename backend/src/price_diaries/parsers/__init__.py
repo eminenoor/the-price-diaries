@@ -1,6 +1,7 @@
 """HTML -> price extraction, one configuration per store."""
 
 from price_diaries.parsers.base import ParsedPrice, Parser, PriceNotFoundError
+from price_diaries.parsers.gtin_text import normalize_gtin
 from price_diaries.parsers.price_text import detect_currency, parse_price
 from price_diaries.parsers.sites import STORES, Store, store_for_host
 from price_diaries.parsers.size_text import Size, SizeUnit, parse_size
@@ -14,6 +15,7 @@ __all__ = [
     "SizeUnit",
     "Store",
     "detect_currency",
+    "normalize_gtin",
     "parse_price",
     "parse_size",
     "store_for_host",

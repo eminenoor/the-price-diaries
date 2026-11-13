@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from datetime import date
 from pathlib import Path
 from typing import Annotated
 
@@ -16,7 +17,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from price_diaries import migrate
-from price_diaries.analysis import price_anomalies, summarize, unit_price
+from price_diaries.analysis import (
+    Offer,
+    cheaper_elsewhere,
+    price_anomalies,
+    rank_offers,
+    saving,
+    summarize,
+    unit_price,
+)
 from price_diaries.checker import check_all, check_product, update_size
 from price_diaries.db import Category, Database, Product
 from price_diaries.fetcher import Fetcher
@@ -28,6 +37,9 @@ from price_diaries.schemas import (
     CategoryOut,
     CategoryUpdate,
     CheckResult,
+    ElsewhereNote,
+    LinkCreate,
+    OfferOut,
     PricePointOut,
     ProductCreate,
     ProductDetail,
@@ -148,7 +160,63 @@ def _history(product: Product, use_member: bool) -> list[tuple]:
     return [(p.checked_at, p.effective_price(use_member)) for p in product.prices]
 
 
-def _to_out(product: Product, use_member: bool) -> ProductOut:
+_STORE_NAMES = {s.key: s.name for s in STORES}
+
+
+def _store_name(key: str) -> str:
+    return _STORE_NAMES.get(key, key)
+
+
+def _offer(product: Product, use_member: bool) -> Offer | None:
+    """The latest price you'd pay at this store, or None before the first check."""
+    if not product.prices:
+        return None
+    latest = product.prices[-1]
+    return Offer(
+        product_id=product.id,
+        price=latest.effective_price(use_member),
+        checked_at=latest.checked_at,
+        in_stock=latest.in_stock,
+        size_amount=product.size_amount,
+        size_unit=product.size_unit,
+    )
+
+
+def _group(session: Session, product: Product) -> list[Product]:
+    """The same product at other stores (not this one)."""
+    if product.group_key is None:
+        return []
+    return list(
+        session.scalars(
+            select(Product).where(Product.group_key == product.group_key, Product.id != product.id)
+        )
+    )
+
+
+def _unit_price_out(price: float, product: Product) -> UnitPriceOut | None:
+    if product.size_amount is None or product.size_unit is None:
+        return None
+    found = unit_price(price, product.size_amount, product.size_unit)
+    return UnitPriceOut(**vars(found)) if found else None
+
+
+def _cheaper_elsewhere(
+    product: Product, others: Sequence[Product], use_member: bool
+) -> ElsewhereNote | None:
+    here = _offer(product, use_member)
+    if here is None:
+        return None
+    offers = [o for o in (_offer(p, use_member) for p in others) if o is not None]
+    best = cheaper_elsewhere(here, offers, date.today())
+    if best is None:
+        return None
+    there = next(p for p in others if p.id == best[0].product_id)
+    return ElsewhereNote(
+        product_id=there.id, store=there.store, store_name=_store_name(there.store), saving=best[1]
+    )
+
+
+def _to_out(product: Product, use_member: bool, others: Sequence[Product] = ()) -> ProductOut:
     history = _history(product, use_member)
     summary = summarize(history)
     latest = product.prices[-1] if product.prices else None
@@ -159,8 +227,7 @@ def _to_out(product: Product, use_member: bool) -> ProductOut:
             amount=product.size_amount, unit=product.size_unit, source=product.size_source
         )
         if summary is not None:
-            found = unit_price(summary.current, product.size_amount, product.size_unit)
-            per_unit = UnitPriceOut(**vars(found)) if found else None
+            per_unit = _unit_price_out(summary.current, product)
     return ProductOut(
         id=product.id,
         url=product.url,
@@ -178,15 +245,40 @@ def _to_out(product: Product, use_member: bool) -> ProductOut:
         sparkline=[price for _, price in history[-30:]],
         size=size,
         unit_price=per_unit,
+        gtin=product.gtin,
+        cheaper_elsewhere=_cheaper_elsewhere(product, others, use_member),
     )
 
 
-def _to_detail(product: Product, use_member: bool) -> ProductDetail:
+def _elsewhere(product: Product, others: Sequence[Product], use_member: bool) -> list[OfferOut]:
+    """The same product at other stores, cheapest first. Unchecked listings are left out."""
+    here = _offer(product, use_member)
+    by_id = {p.id: p for p in others}
+    offers = [o for o in (_offer(p, use_member) for p in others) if o is not None]
+    return [
+        OfferOut(
+            product_id=offer.product_id,
+            name=by_id[offer.product_id].name,
+            store=by_id[offer.product_id].store,
+            store_name=_store_name(by_id[offer.product_id].store),
+            price=offer.price,
+            unit_price=_unit_price_out(offer.price, by_id[offer.product_id]),
+            checked_at=offer.checked_at,
+            in_stock=offer.in_stock,
+            saving=saving(here, offer) if here else None,
+        )
+        for offer in rank_offers(offers)
+    ]
+
+
+def _to_detail(session: Session, product: Product, use_member: bool) -> ProductDetail:
     history = _history(product, use_member)
+    others = _group(session, product)
     return ProductDetail(
-        **_to_out(product, use_member).model_dump(),
+        **_to_out(product, use_member, others).model_dump(),
         history=[PricePointOut.model_validate(p, from_attributes=True) for p in product.prices],
         anomalies=[AnomalyOut(**vars(a)) for a in price_anomalies(history)],
+        elsewhere=_elsewhere(product, others, use_member),
     )
 
 
@@ -247,7 +339,18 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/api/products")
     def list_products(session: SessionDep, settings: SettingsDep) -> list[ProductOut]:
         products = session.scalars(select(Product).order_by(Product.name)).all()
-        return [_to_out(p, settings.use_member_prices) for p in products]
+        groups: dict[str, list[Product]] = {}
+        for p in products:
+            if p.group_key is not None:
+                groups.setdefault(p.group_key, []).append(p)
+        return [
+            _to_out(
+                p,
+                settings.use_member_prices,
+                [o for o in groups.get(p.group_key or "", []) if o.id != p.id],
+            )
+            for p in products
+        ]
 
     @app.post("/api/products", status_code=status.HTTP_201_CREATED)
     def create_product(
@@ -279,7 +382,7 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get("/api/products/{product_id}")
     def get_product(product_id: int, session: SessionDep, settings: SettingsDep) -> ProductDetail:
-        return _to_detail(_get_product(session, product_id), settings.use_member_prices)
+        return _to_detail(session, _get_product(session, product_id), settings.use_member_prices)
 
     @app.patch("/api/products/{product_id}")
     def update_product(
@@ -308,7 +411,35 @@ def _register_routes(app: FastAPI) -> None:
         if "name" in changes:
             update_size(product)
         session.commit()
-        return _to_out(product, settings.use_member_prices)
+        return _to_out(product, settings.use_member_prices, _group(session, product))
+
+    @app.post("/api/products/{product_id}/link")
+    def link_product(
+        product_id: int, body: LinkCreate, session: SessionDep, settings: SettingsDep
+    ) -> ProductDetail:
+        """Group this product with another one: the same product at another store.
+
+        It joins the other product's group (leaving its own). Checks won't move it
+        again, even if the barcodes differ.
+        """
+        product = _get_product(session, product_id)
+        other = session.get(Product, body.other_id)
+        if other is None or other.id == product.id:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick another tracked product to link."
+            )
+        if other.group_key is None:
+            other.group_key, other.group_source = f"user:{other.id}", "user"
+        product.group_key, product.group_source = other.group_key, "user"
+        session.commit()
+        return _to_detail(session, product, settings.use_member_prices)
+
+    @app.delete("/api/products/{product_id}/link", status_code=status.HTTP_204_NO_CONTENT)
+    def unlink_product(product_id: int, session: SessionDep) -> None:
+        """Take this product out of its group. Checks won't put it back by barcode."""
+        product = _get_product(session, product_id)
+        product.group_key, product.group_source = None, "user"
+        session.commit()
 
     @app.delete("/api/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
     def delete_product(product_id: int, session: SessionDep) -> None:

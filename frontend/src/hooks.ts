@@ -40,6 +40,11 @@ export const useSetTarget = () =>
   useInvalidating(({ id, target }: { id: number; target: number }) =>
     api.update(id, { target_price: target }),
   );
+/** Group a product with the same product at another store. */
+export const useLink = () =>
+  useInvalidating(({ id, otherId }: { id: number; otherId: number }) => api.link(id, otherId));
+/** Take a product out of its group, for good: checks won't regroup it by barcode. */
+export const useUnlink = () => useInvalidating((id: number) => api.unlink(id));
 /** size "" removes the size; anything else is parsed by the backend ("1,5 L"). */
 export const useSetSize = () =>
   useInvalidating(({ id, size }: { id: number; size: string }) => api.update(id, { size }));

@@ -65,6 +65,13 @@ class Product(Base):
     size_amount: Mapped[float | None] = mapped_column(Float)
     size_unit: Mapped[str | None] = mapped_column(String(3))
     size_source: Mapped[str | None] = mapped_column(String(4))
+    # Barcode from the store page, as 14 digits (GTIN-14; EAN-13 and UPC padded with zeros).
+    gtin: Mapped[str | None] = mapped_column(String(14))
+    # The same product at other stores shares a group_key: "gtin:<barcode>" when grouped by
+    # barcode, "user:<id>" when linked by hand. group_source "user" means the user linked or
+    # unlinked it, so checks leave the group alone.
+    group_key: Mapped[str | None] = mapped_column(String(24), index=True)
+    group_source: Mapped[str | None] = mapped_column(String(7))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     prices: Mapped[list[PricePoint]] = relationship(

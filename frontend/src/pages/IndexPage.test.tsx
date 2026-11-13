@@ -25,6 +25,8 @@ const base = {
   regular_price: null,
   size: null,
   unit_price: null,
+  gtin: null,
+  cheaper_elsewhere: null,
   sparkline: [],
   brand: null,
 };
@@ -173,5 +175,32 @@ describe("IndexPage unit prices", () => {
     renderIndex(sized);
     const link = await screen.findByRole("link", { name: /Zinc toner/ });
     expectUnitPrice(link.querySelector(".unit-price"), "25,30", "10 ml");
+  });
+});
+
+const NOTE = { product_id: 9, store: "watsons", store_name: "Watsons", saving: 40 };
+
+/** Zinc toner and the blocked Barrier cream are cheaper at Watsons today. */
+function withNote(): Product[] {
+  return PRODUCTS.map((p) => (p.id === 3 || p.id === 2 ? { ...p, cheaper_elsewhere: NOTE } : p));
+}
+
+describe("IndexPage cheaper elsewhere", () => {
+  it("notes a cheaper store under the price in night view", async () => {
+    renderIndex(withNote());
+    const link = await screen.findByRole("link", { name: /Zinc toner/ });
+    const note = link.querySelector(".cheaper-elsewhere");
+    expect(note).toHaveTextContent("40,00 lira");
+    expect(note).toHaveTextContent("cheaper at Watsons");
+    expect(screen.getByRole("link", { name: /Aloe toner/ }).querySelector(".cheaper-elsewhere")).toBeNull();
+    // A blocked store's window only says why it's blocked.
+    expect(screen.getByRole("link", { name: /Barrier cream/ }).querySelector(".cheaper-elsewhere")).toBeNull();
+  });
+
+  it("does the same in quiet mode", async () => {
+    localStorage.setItem("price-diaries:mode", "quiet");
+    renderIndex(withNote());
+    const link = await screen.findByRole("link", { name: /Zinc toner/ });
+    expect(link.querySelector(".cheaper-elsewhere")).toHaveTextContent("cheaper at Watsons");
   });
 });

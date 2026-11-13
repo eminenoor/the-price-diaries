@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { PricePoint, ProductDetail } from "../api";
+import type { Offer, PricePoint, Product, ProductDetail } from "../api";
 import { ModeProvider } from "../mode";
 import { expectUnitPrice } from "../test-utils";
 import { ProductPage } from "./ProductPage";
@@ -43,6 +43,8 @@ export const detail = (overrides: Partial<ProductDetail> = {}): ProductDetail =>
   regular_price: null,
   size: null,
   unit_price: null,
+  gtin: null,
+  cheaper_elsewhere: null,
   sparkline: [],
   history: [
     point("2026-11-05T09:17:00", 320),
@@ -50,10 +52,11 @@ export const detail = (overrides: Partial<ProductDetail> = {}): ProductDetail =>
     point("2026-11-10T09:17:00", 268.22),
   ],
   anomalies: [],
+  elsewhere: [],
   ...overrides,
 });
 
-export function renderProduct(product: ProductDetail) {
+export function renderProduct(product: ProductDetail, others: Product[] = []) {
   const calls: { method: string; path: string; body: unknown }[] = [];
   vi.stubGlobal(
     "fetch",
@@ -67,7 +70,9 @@ export function renderProduct(product: ProductDetail) {
           ? [{ key: "gratis", name: "Gratis", domains: [] }]
           : path === "/categories"
             ? []
-            : method === "PATCH"
+            : path === "/products"
+              ? [product, ...others]
+              : method === "PATCH"
               ? { ...product, ...(body as object) }
               : product;
       return new Response(JSON.stringify(data), { headers: { "Content-Type": "application/json" } });
@@ -270,5 +275,72 @@ describe("ProductPage size", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save size" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(message);
     expect(screen.getByRole("textbox", { name: "Size" })).toBeInTheDocument();
+  });
+});
+
+describe("ProductPage elsewhere", () => {
+  const offer = (overrides: Partial<Offer>): Offer => ({
+    product_id: 8,
+    name: "Toner 150 ml",
+    store: "watsons",
+    store_name: "Watsons",
+    price: 229.33,
+    unit_price: { price: 15.29, per: 10, unit: "ml" },
+    checked_at: "2026-11-10T09:17:00",
+    in_stock: true,
+    saving: 38.89,
+    ...overrides,
+  });
+  const twoStores = () =>
+    detail({
+      elsewhere: [
+        offer({}),
+        offer({ product_id: 9, store: "rossmann", store_name: "Rossmann", price: 280.22, saving: -12, unit_price: null }),
+      ],
+    });
+
+  it("lists the same product at other stores, cheapest first, compared with this one", async () => {
+    renderProduct(twoStores());
+    const section = await screen.findByRole("region", { name: "elsewhere" });
+    const rows = within(section).getAllByRole("listitem");
+    expect(rows.map((r) => within(r).getByRole("link").textContent)).toEqual([
+      "Watsons, Toner 150 ml",
+      "Rossmann, Toner 150 ml",
+    ]);
+    expect(rows[0]).toHaveTextContent("38,89 lira");
+    expect(rows[0]).toHaveTextContent(/cheaper/);
+    expectUnitPrice(rows[0].querySelector(".unit-price"), "15,29", "10 ml");
+    expect(rows[1]).toHaveTextContent("12,00 lira");
+    expect(rows[1]).toHaveTextContent(/more/);
+    expect(within(rows[0]).getByRole("link")).toHaveAttribute("href", "/products/8");
+  });
+
+  it("unlinks a listing that isn't the same product", async () => {
+    const calls = renderProduct(twoStores());
+    const section = await screen.findByRole("region", { name: "elsewhere" });
+    fireEvent.click(within(section).getByRole("button", { name: "Not the same product at Rossmann" }));
+    await waitFor(() =>
+      expect(calls).toContainEqual({ method: "DELETE", path: "/products/9/link", body: undefined }),
+    );
+  });
+
+  it("links another tracked product by hand", async () => {
+    const other = { ...detail({ id: 12, store: "watsons", name: "Miracle Toner" }) };
+    const calls = renderProduct(detail(), [other]);
+    const section = await screen.findByRole("region", { name: "elsewhere" });
+    expect(section).toHaveTextContent("Not tracked at another store yet.");
+    const select = await within(section).findByRole("combobox", { name: "Same product at" });
+    fireEvent.change(select, { target: { value: "12" } });
+    fireEvent.click(within(section).getByRole("button", { name: "Link products" }));
+    await waitFor(() =>
+      expect(calls).toContainEqual({ method: "POST", path: "/products/7/link", body: { other_id: 12 } }),
+    );
+  });
+
+  it("doesn't offer products that are already linked, or itself", async () => {
+    renderProduct(twoStores(), [detail({ id: 8 }), detail({ id: 9 })]);
+    const section = await screen.findByRole("region", { name: "elsewhere" });
+    await screen.findAllByRole("listitem");
+    expect(within(section).queryByRole("combobox")).not.toBeInTheDocument();
   });
 });

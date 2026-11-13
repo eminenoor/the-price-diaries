@@ -9,6 +9,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
+from price_diaries.parsers.gtin_text import normalize_gtin
 from price_diaries.parsers.price_text import detect_currency, parse_price
 from price_diaries.parsers.size_text import Size, parse_size
 
@@ -23,6 +24,7 @@ class ParsedPrice:
     image_url: str | None = None  # product photo (og:image or JSON-LD), https only
     brand: str | None = None  # JSON-LD Product.brand.name, or a brand meta tag
     size: Size | None = None  # pack size from JSON-LD size/weight/name or og:title
+    gtin: str | None = None  # barcode, 14 digits, from JSON-LD gtin13/gtin/... or meta tags
 
 
 class PriceNotFoundError(LookupError):
@@ -52,7 +54,11 @@ class Parser:
                 if member is not None and member < result.price:
                     result = replace(result, member_price=member)
                 return replace(
-                    result, image_url=_image_url(soup), brand=_brand(soup), size=_size(soup)
+                    result,
+                    image_url=_image_url(soup),
+                    brand=_brand(soup),
+                    size=_size(soup),
+                    gtin=_gtin(soup),
                 )
         raise PriceNotFoundError("No price found on page. Try adding a 'selector' for it.")
 
@@ -237,6 +243,40 @@ def _brand(soup: BeautifulSoup) -> str | None:
             clean = " ".join(name.split())
             if clean and len(clean) <= BRAND_MAX_LENGTH:
                 return clean
+    return None
+
+
+_GTIN_KEYS = ("gtin13", "gtin", "gtin14", "gtin12", "gtin8", "ean")
+_GTIN_META = (
+    {"itemprop": "gtin13"},
+    {"itemprop": "gtin"},
+    {"itemprop": "gtin14"},
+    {"itemprop": "gtin12"},
+    {"itemprop": "gtin8"},
+    {"property": "product:ean"},
+    {"property": "product:gtin"},
+    {"property": "product:upc"},
+    {"name": "ean"},
+)
+
+
+def _gtin(soup: BeautifulSoup) -> str | None:
+    """The barcode: JSON-LD Product (or its offers) first, then meta tags and microdata."""
+    candidates: list[Any] = []
+    for tag in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(tag.string or "")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        for node in _walk(data):
+            if _is_type(node, "Product") or _is_type(node, "Offer"):
+                candidates.extend(node.get(key) for key in _GTIN_KEYS)
+    for attrs in _GTIN_META:
+        for tag in soup.find_all(attrs=attrs):
+            candidates.append(tag.get("content") or tag.get_text(" ", strip=True))
+    for value in candidates:
+        if isinstance(value, (str, int)) and (gtin := normalize_gtin(value)):
+            return gtin
     return None
 
 

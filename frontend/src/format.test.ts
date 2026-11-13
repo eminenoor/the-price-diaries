@@ -40,6 +40,8 @@ const product = (overrides: Partial<Product> = {}): Product => ({
   regular_price: null,
   size: null,
   unit_price: null,
+  gtin: null,
+  cheaper_elsewhere: null,
   sparkline: [],
   brand: null,
   ...overrides,

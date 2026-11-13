@@ -52,6 +52,29 @@ export interface UnitPrice {
   unit: SizeUnit;
 }
 
+/** The same product is cheaper at another store today, for this product's size. */
+export interface ElsewhereNote {
+  product_id: number;
+  store: string;
+  store_name: string;
+  saving: number;
+}
+
+/** The same product at another store. */
+export interface Offer {
+  product_id: number;
+  name: string;
+  store: string;
+  store_name: string;
+  /** The price you'd pay there (the card price when shown). */
+  price: number;
+  unit_price: UnitPrice | null;
+  checked_at: string;
+  in_stock: boolean;
+  /** How much less it costs there than here, for this size; negative when it costs more. */
+  saving: number | null;
+}
+
 export interface Product {
   id: number;
   url: string;
@@ -76,6 +99,10 @@ export interface Product {
   size: Size | null;
   /** Null without a size or a price. */
   unit_price: UnitPrice | null;
+  /** Barcode, 14 digits, or null. */
+  gtin: string | null;
+  /** Null unless another store is cheaper today. */
+  cheaper_elsewhere: ElsewhereNote | null;
 }
 
 export interface PricePoint {
@@ -96,6 +123,8 @@ export interface Anomaly {
 export interface ProductDetail extends Product {
   history: PricePoint[];
   anomalies: Anomaly[];
+  /** The same product at other stores, cheapest first. */
+  elsewhere: Offer[];
 }
 
 export interface CheckResult {
@@ -156,6 +185,12 @@ export const api = {
   update: (id: number, body: ProductChanges) =>
     request<Product>(`/products/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   remove: (id: number) => request<void>(`/products/${id}`, { method: "DELETE" }),
+  link: (id: number, otherId: number) =>
+    request<ProductDetail>(`/products/${id}/link`, {
+      method: "POST",
+      body: JSON.stringify({ other_id: otherId }),
+    }),
+  unlink: (id: number) => request<void>(`/products/${id}/link`, { method: "DELETE" }),
   check: (id: number) => request<CheckResult>(`/products/${id}/check`, { method: "POST" }),
   checkAll: () => request<CheckResult[]>("/check", { method: "POST" }),
 };

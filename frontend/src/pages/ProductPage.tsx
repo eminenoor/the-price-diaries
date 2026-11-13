@@ -2,6 +2,7 @@ import { lazy, Suspense, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import type { Size } from "../api";
+import { Elsewhere } from "../components/Elsewhere";
 import { LinerNotes } from "../components/LinerNotes";
 import { PencilCircle, PencilX } from "../components/Pencil";
 import { Price, RegularPriceNote, UnitPrice } from "../components/Price";
@@ -125,6 +126,8 @@ export function ProductPage() {
           )}
         </div>
       </div>
+
+      <Elsewhere product={product} />
 
       {product.history.length === 1 ? (
         <p className="chart-note">the chart starts after a few days of checks</p>

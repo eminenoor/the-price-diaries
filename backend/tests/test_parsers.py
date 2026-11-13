@@ -246,3 +246,26 @@ def _product_ld(fields: str) -> str:
 )
 def test_product_size(html, expected):
     assert Parser().parse(html).size == expected
+
+
+@pytest.mark.parametrize(
+    ("html", "expected"),
+    [
+        (_product_ld('"gtin13": "8809598452350"'), "08809598452350"),
+        (_product_ld('"gtin": 36000291452'), None),  # a number that lost its leading 0
+        (_product_ld('"gtin": "036000291452"'), "00036000291452"),
+        (_product_ld('"gtin13": "8809598452351", "gtin": "036000291452"'), "00036000291452"),
+        (
+            '<script type="application/ld+json">{"@type": "Product", "offers": '
+            '{"@type": "Offer", "price": "99.90", "gtin13": "8809598452350"}}</script>',
+            "08809598452350",
+        ),
+        ('<meta itemprop="gtin13" content="8809598452350">' + META_PAGE, "08809598452350"),
+        ('<meta property="product:ean" content="8809598452350">' + META_PAGE, "08809598452350"),
+        ('<span itemprop="gtin13">8809598452350</span>' + META_PAGE, "08809598452350"),
+        (_product_ld('"sku": "8809598452350"'), None),  # a SKU isn't a barcode
+        (JSON_LD_PAGE, None),
+    ],
+)
+def test_product_barcode(html, expected):
+    assert Parser().parse(html).gtin == expected

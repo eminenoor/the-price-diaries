@@ -446,3 +446,51 @@
 :root[data-mode="quiet"] .room__price .unit-price {
   color: var(--text);
 }
+
+/* ---------- Elsewhere: the same product at other stores ---------- */
+
+.elsewhere {
+  position: relative;
+  max-width: 44rem;
+  margin: var(--space-5) auto 0;
+  text-align: center;
+}
+
+.elsewhere__title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--step-3);
+}
+
+.elsewhere__list {
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.elsewhere__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.25em 0.9em;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid currentColor;
+}
+
+.elsewhere__store {
+  font-weight: 700;
+}
+
+.elsewhere__compare {
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+.edit-form select {
+  max-width: 18rem;
+  padding: 0.3em 0.2em;
+  border: 0;
+  border-bottom: 2px solid var(--text);
+  background: var(--bg);
+  color: var(--text);
+}

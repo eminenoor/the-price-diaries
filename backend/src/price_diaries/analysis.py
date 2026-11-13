@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import statistics
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 History = list[tuple[datetime, float]]  # sorted oldest -> newest
@@ -157,4 +157,76 @@ def unit_price(price: float, amount: float, unit: str) -> UnitPrice | None:
     # Decimal, so a half kuruş rounds up the way a shop would (14,495 -> 14,50); float
     # rounding would give 14,49.
     exact = Decimal(str(price)) / Decimal(str(amount)) * per
-    return UnitPrice(float(exact.quantize(Decimal("0.01"), ROUND_HALF_UP)), per, unit)
+    return UnitPrice(_kurus(exact), per, unit)
+
+
+# --- the same product at other stores ----------------------------------------------
+
+# Smaller differences aren't worth a note on the home page.
+MIN_SAVING = 1.0
+
+
+@dataclass(frozen=True)
+class Offer:
+    """One store's listing of a product, at the price you'd actually pay."""
+
+    product_id: int
+    price: float
+    checked_at: datetime
+    in_stock: bool = True
+    size_amount: float | None = None
+    size_unit: str | None = None
+
+
+def _kurus(value: Decimal) -> float:
+    return float(value.quantize(Decimal("0.01"), ROUND_HALF_UP))
+
+
+def saving(here: Offer, there: Offer) -> float | None:
+    """How much less ``there`` costs than ``here``, for the amount ``here`` sells.
+
+    With both sizes known, ``there`` is scaled to ``here``'s pack size, so a 1,5 L
+    bottle compares fairly with a 2,5 L one. Without both sizes the packs are
+    assumed to match (they share a barcode or were linked by hand). Sizes in
+    different units (ml against g) can't be compared: None. Negative means
+    ``there`` costs more.
+    """
+    there_price = Decimal(str(there.price))
+    if here.size_amount and there.size_amount:
+        if here.size_unit != there.size_unit:
+            return None
+        there_price = there_price / Decimal(str(there.size_amount)) * Decimal(str(here.size_amount))
+    return _kurus(Decimal(str(here.price)) - there_price)
+
+
+def rank_offers(offers: list[Offer]) -> list[Offer]:
+    """Cheapest first: by price per unit when every offer has a size in the same unit,
+    otherwise by price. Ties go to the most recently checked."""
+    units = {o.size_unit for o in offers}
+    by_unit = len(units) == 1 and None not in units and all(o.size_amount for o in offers)
+
+    def key(o: Offer) -> tuple[float, float]:
+        price = o.price / o.size_amount if by_unit and o.size_amount else o.price
+        return (price, -o.checked_at.timestamp())
+
+    return sorted(offers, key=key)
+
+
+def cheaper_elsewhere(here: Offer, others: list[Offer], today: date) -> tuple[Offer, float] | None:
+    """The other store with the biggest saving today, if it saves at least ``MIN_SAVING``.
+
+    Only listings checked today and in stock count: a price from last week, or one
+    you can't buy, isn't a reason to shop elsewhere.
+    """
+    best: tuple[Offer, float] | None = None
+    for there in others:
+        if there.product_id == here.product_id or not there.in_stock:
+            continue
+        if there.checked_at.date() != today:
+            continue
+        amount = saving(here, there)
+        if amount is None or amount < MIN_SAVING:
+            continue
+        if best is None or amount > best[1]:
+            best = (there, amount)
+    return best

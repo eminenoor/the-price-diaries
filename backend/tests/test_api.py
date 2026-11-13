@@ -303,3 +303,107 @@ def test_renaming_rereads_the_size(client):
     assert renamed["size"]["amount"] == 50
     renamed = client.patch(f"/api/products/{product_id}", json={"name": "Serum"}).json()
     assert renamed["size"] is None
+
+
+WATSONS_URL = "https://www.watsons.com.tr/toner-p-2"
+
+
+def barcode_page(price: str, gtin: str = "8809598452350") -> str:
+    return (
+        '<script type="application/ld+json">'
+        f'{{"@type": "Product", "gtin13": "{gtin}", '
+        f'"offers": {{"price": "{price}", "priceCurrency": "TRY"}}}}'
+        "</script>"
+    )
+
+
+def two_stores(client, fake_pages, here="400.00", there="340.00", gtin="8809598452350"):
+    """The same toner at Gratis and Watsons, both checked."""
+    fake_pages[URL] = barcode_page(here)
+    fake_pages[WATSONS_URL] = barcode_page(there, gtin)
+    gratis = add_product(client, name="Toner 150 ml").json()["id"]
+    watsons = add_product(client, url=WATSONS_URL, name="Toner 150 ml").json()["id"]
+    client.post("/api/check")
+    return gratis, watsons
+
+
+def test_same_barcode_groups_products(client, fake_pages):
+    gratis, watsons = two_stores(client, fake_pages)
+    detail = client.get(f"/api/products/{gratis}").json()
+    assert detail["gtin"] == "08809598452350"
+    assert [o["product_id"] for o in detail["elsewhere"]] == [watsons]
+    offer = detail["elsewhere"][0]
+    assert offer["store_name"] == "Watsons"
+    assert offer["price"] == 340
+    assert offer["unit_price"] == {"price": 22.67, "per": 10, "unit": "ml"}
+    assert offer["saving"] == 60
+
+
+def test_home_notes_a_cheaper_store(client, fake_pages):
+    gratis, watsons = two_stores(client, fake_pages)
+    products = {p["id"]: p for p in client.get("/api/products").json()}
+    assert products[gratis]["cheaper_elsewhere"] == {
+        "product_id": watsons,
+        "store": "watsons",
+        "store_name": "Watsons",
+        "saving": 60,
+    }
+    assert products[watsons]["cheaper_elsewhere"] is None  # it's the cheaper one
+
+
+def test_cheaper_elsewhere_uses_member_price(client, fake_pages):
+    two_stores(client, fake_pages, here="289.90", there="200.00")
+    fake_pages[URL] = barcode_page("289.90") + MEMBER_PAGE.removeprefix(PAGE)
+    client.post("/api/check")
+    # The card price at Gratis (149,90) beats Watsons, so the note moves to Watsons' window.
+    products = {p["store"]: p for p in client.get("/api/products").json()}
+    assert products["gratis"]["cheaper_elsewhere"] is None
+    assert products["watsons"]["cheaper_elsewhere"]["saving"] == 50.1
+
+
+def test_different_barcodes_stay_apart(client, fake_pages):
+    gratis, _ = two_stores(client, fake_pages, gtin="036000291452")
+    assert client.get(f"/api/products/{gratis}").json()["elsewhere"] == []
+
+
+def test_link_by_hand(client, fake_pages):
+    gratis, watsons = two_stores(client, fake_pages, gtin="036000291452")
+    linked = client.post(f"/api/products/{gratis}/link", json={"other_id": watsons}).json()
+    assert [o["product_id"] for o in linked["elsewhere"]] == [watsons]
+    # Both directions, and checks don't undo it although the barcodes differ.
+    client.post("/api/check")
+    other = client.get(f"/api/products/{watsons}").json()
+    assert [o["product_id"] for o in other["elsewhere"]] == [gratis]
+
+
+def test_link_joins_the_other_group(client, fake_pages):
+    gratis, watsons = two_stores(client, fake_pages)
+    fake_pages["https://www.watsons.com.tr/toner-p-3"] = PAGE
+    third = add_product(client, url="https://www.watsons.com.tr/toner-p-3", name="Toner").json()
+    client.post(f"/api/products/{third['id']}/link", json={"other_id": gratis})
+    client.post(f"/api/products/{third['id']}/check")
+    elsewhere = client.get(f"/api/products/{gratis}").json()["elsewhere"]
+    assert {o["product_id"] for o in elsewhere} == {watsons, third["id"]}
+
+
+def test_unlink_by_hand_survives_checks(client, fake_pages):
+    gratis, watsons = two_stores(client, fake_pages)
+    assert client.delete(f"/api/products/{watsons}/link").status_code == 204
+    client.post("/api/check")
+    assert client.get(f"/api/products/{gratis}").json()["elsewhere"] == []
+    assert client.get(f"/api/products/{watsons}").json()["elsewhere"] == []
+
+
+def test_cannot_link_to_itself_or_nothing(client):
+    product_id = add_product(client).json()["id"]
+    for other in (product_id, 999):
+        response = client.post(f"/api/products/{product_id}/link", json={"other_id": other})
+        assert response.status_code == 422
+
+
+def test_unchecked_products_are_left_out_of_elsewhere(client, fake_pages):
+    fake_pages[URL] = PAGE
+    gratis = add_product(client).json()["id"]
+    watsons = add_product(client, url=WATSONS_URL, name="Serum").json()["id"]
+    client.post(f"/api/products/{gratis}/link", json={"other_id": watsons})
+    assert client.get(f"/api/products/{gratis}").json()["elsewhere"] == []

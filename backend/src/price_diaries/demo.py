@@ -3,7 +3,8 @@
 For developing the UI and taking README screenshots, so real scraped data
 never needs to be published. Every floor and every state the UI can show
 (good deal, fake sale, no change, price up, blocked store, member price,
-one check only, two days of checks, not checked yet, empty floor, with and without a brand)
+one check only, two days of checks, not checked yet, empty floor, with and without a brand,
+the same product at two stores by barcode and by hand)
 appears at least once, and the result is the same every run.
 """
 
@@ -17,7 +18,7 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from price_diaries.checker import update_size
+from price_diaries.checker import update_group, update_size
 from price_diaries.db import Category, PricePoint, Product
 from price_diaries.fetcher import StoreBlockedError
 
@@ -34,7 +35,11 @@ class DemoProduct:
     ending: Ending
     member_share: float | None = None  # loyalty-card price as a share of the shelf price
     brand: str | None = None
+    gtin: str | None = None  # same barcode = same product at another store
+    link: str | None = None  # linked by hand to others with the same link
 
+
+TONER_GTIN = "08809598452350"
 
 DEMO_PRODUCTS = [
     DemoProduct(
@@ -46,6 +51,18 @@ DEMO_PRODUCTS = [
         "deal",
         0.52,
         brand="Some By Mi",
+        gtin=TONER_GTIN,
+    ),
+    # The same toner at another store, found by its barcode: cheaper there today.
+    DemoProduct(
+        "Some By Mi AHA BHA PHA Miracle Toner 150 ml",
+        "watsons",
+        "Skincare",
+        "Toners",
+        340,
+        "steady",
+        brand="Some By Mi",
+        gtin=TONER_GTIN,
     ),
     DemoProduct("Niacinamide 10% Toner 200 ml", "trendyol", "Skincare", "Toners", 210, "steady"),
     DemoProduct(
@@ -90,7 +107,13 @@ DEMO_PRODUCTS = [
     ),
     DemoProduct("Single-Origin Filter Coffee 500 g", "amazon", "Pantry", "Coffee", 420, "steady"),
     DemoProduct("Cold-Pressed Olive Oil 1 l", "trendyol", "Pantry", "Olive oil", 610, "deal"),
-    DemoProduct("Laundry Liquid 2.5 l", "rossmann", "Cleaning", "Laundry", 289, "fake"),
+    DemoProduct(
+        "Laundry Liquid 2.5 l", "rossmann", "Cleaning", "Laundry", 289, "fake", link="laundry"
+    ),
+    # A smaller bottle elsewhere, linked by hand: cheaper per ml, so cheaper for 2.5 l too.
+    DemoProduct(
+        "Laundry Liquid 1.5 l", "trendyol", "Cleaning", "Laundry", 165, "steady", link="laundry"
+    ),
     DemoProduct("Dishwasher Tablets 60 pcs", "amazon", "Cleaning", "Kitchen", 499, "waiting"),
     DemoProduct(
         "Vitamin D3 1000 IU, 90 tablets", "gratis", "Supplements", "Vitamins", 275, "steady"
@@ -171,6 +194,9 @@ def seed_demo(session: Session, days: int = 90, seed: int = 7) -> int:
             brand=demo.brand,
         )
         update_size(product)  # from the name, like a new product
+        update_group(product, demo.gtin)
+        if demo.link:
+            product.group_key, product.group_source = f"user:{demo.link}", "user"
         if demo.ending == "blocked":
             error = StoreBlockedError(f"www.{demo.store}.com.tr", 403)
             product.last_error, product.blocked = str(error), True

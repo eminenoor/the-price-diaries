@@ -90,6 +90,15 @@ class Summary(BaseModel):
     fake_sale: bool
 
 
+class ElsewhereNote(BaseModel):
+    """The same product is cheaper at another store today."""
+
+    product_id: int
+    store: str
+    store_name: str
+    saving: float = Field(description="How much less it costs there, for this product's size.")
+
+
 class ProductOut(BaseModel):
     id: int
     url: str
@@ -113,6 +122,10 @@ class ProductOut(BaseModel):
     unit_price: UnitPriceOut | None = Field(
         default=None, description="Current price (the card price when shown) per unit of size."
     )
+    gtin: str | None = Field(default=None, description="Barcode, 14 digits, if the store shows it.")
+    cheaper_elsewhere: ElsewhereNote | None = Field(
+        default=None, description="The biggest saving at another store, from today's checks."
+    )
 
 
 class PricePointOut(BaseModel):
@@ -130,9 +143,33 @@ class AnomalyOut(BaseModel):
     score: float
 
 
+class OfferOut(BaseModel):
+    """The same product at another store."""
+
+    product_id: int
+    name: str
+    store: str
+    store_name: str
+    price: float = Field(description="The price you'd pay there (the card price when shown).")
+    unit_price: UnitPriceOut | None
+    checked_at: datetime
+    in_stock: bool
+    saving: float | None = Field(
+        description="How much less it costs there than here, for this product's size. "
+        "Negative when it costs more; None when the sizes can't be compared."
+    )
+
+
 class ProductDetail(ProductOut):
     history: list[PricePointOut]
     anomalies: list[AnomalyOut]
+    elsewhere: list[OfferOut] = Field(
+        default_factory=list, description="The same product at other stores, cheapest first."
+    )
+
+
+class LinkCreate(BaseModel):
+    other_id: int = Field(description="A product to group this one with.")
 
 
 class CheckResult(BaseModel):

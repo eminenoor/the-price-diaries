@@ -500,3 +500,9 @@
   margin-top: var(--space-3);
   text-align: center;
 }
+
+/* "₺40,00 cheaper at Watsons": a small strip under the price. */
+.label--elsewhere {
+  font-size: var(--step--1);
+  font-weight: 700;
+}

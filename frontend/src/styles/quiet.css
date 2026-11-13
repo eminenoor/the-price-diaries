@@ -240,3 +240,9 @@
     font-size: 1.6rem;
   }
 }
+
+.poster-item__elsewhere {
+  display: block;
+  font-size: var(--step--1);
+  font-weight: 700;
+}

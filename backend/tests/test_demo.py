@@ -42,3 +42,15 @@ def test_demo_covers_every_state_and_floor(client):
     assert len(empty) == 1 and empty[0]["parent_id"] is None
     assert not any(p["category_id"] == empty[0]["id"] for p in products.values())
     assert any(p["brand"] is None for p in products.values())
+
+
+def test_demo_has_the_same_product_at_two_stores(client):
+    with client.app.state.db.session() as session:
+        seed_demo(session)
+    products = {p["name"]: p for p in client.get("/api/products").json()}
+
+    toner = products["AHA BHA PHA 30 Days Miracle Toner 150 ml"]["cheaper_elsewhere"]
+    assert toner["store_name"] == "Watsons" and toner["saving"] > 0
+    # A bigger bottle compared per ml: 1,5 L for ₺165 is ₺275 for 2,5 L.
+    laundry = products["Laundry Liquid 2.5 l"]["cheaper_elsewhere"]
+    assert laundry["store_name"] == "Trendyol" and laundry["saving"] == 14

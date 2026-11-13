@@ -81,6 +81,17 @@ def update_size(product: Product, page_size: Size | None = None) -> None:
     product.size_amount, product.size_unit, product.size_source = size.amount, size.unit, source
 
 
+def update_group(product: Product, gtin: str | None) -> None:
+    """Remember the barcode, and group the product with others that share it.
+
+    A product the user linked or unlinked by hand keeps its group.
+    """
+    if gtin:
+        product.gtin = gtin
+    if product.group_source != "user" and product.gtin:
+        product.group_key, product.group_source = f"gtin:{product.gtin}", "barcode"
+
+
 def _is_blocked(exc: Exception) -> bool:
     """The store refuses automated checks. A 429 (slow down) is temporary, so it isn't."""
     return isinstance(exc, StoreBlockedError) and exc.status != 429
@@ -114,6 +125,7 @@ async def check_product(
     if product.brand is None:  # never overwrite a brand the user set or removed
         product.brand = parsed.brand
     update_size(product, parsed.size)
+    update_group(product, parsed.gtin)
     session.commit()
     log.info("%s: %.2f %s (%s)", product.name, parsed.price, parsed.currency, parsed.source)
     return CheckOutcome(product.id, ok=True, price=parsed.member_price or parsed.price)
@@ -157,6 +169,7 @@ async def check_all(
             if product.brand is None:
                 product.brand = result.brand
             update_size(product, result.size)
+            update_group(product, result.gtin)
             outcomes.append(
                 CheckOutcome(product.id, ok=True, price=result.member_price or result.price)
             )

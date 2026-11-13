@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { Category, Product } from "../api";
 import { windowState } from "../scene";
 import { PencilCircle, PencilX } from "./Pencil";
+import { CheaperElsewhere } from "./Elsewhere";
 import { Price, UnitPrice } from "./Price";
 import { ProductPhoto } from "./ProductPhoto";
 
@@ -41,6 +42,7 @@ export function QuietItem({ product, storeName, room }: QuietItemProps) {
             <span className="poster-item__card">card price</span>
           )}
           {s && <UnitPrice unit={product.unit_price} className="poster-item__unit" />}
+          <CheaperElsewhere note={product.cheaper_elsewhere} className="poster-item__elsewhere" />
           <span className={marked ? "hand-note" : "poster-item__words"}>
             {state.kind === "deal" ? `${state.words}!` : state.kind === "fake" ? "fake sale, skip" : state.words}
           </span>
