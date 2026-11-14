@@ -1,6 +1,6 @@
 import pytest
 
-from price_diaries.parsers import Size, parse_size
+from price_diaries.parsers import Size, parse_size, with_size
 
 
 @pytest.mark.parametrize(
@@ -64,3 +64,21 @@ def test_takes_the_first_size():
 
 def test_skips_a_dose_before_the_pack_size():
     assert parse_size("Omega-3 1000 mg 60 kapsül") == Size(60, "pcs")
+
+
+def test_with_size_swaps_in_this_stores_size():
+    assert with_size("Laundry Liquid 2.5 l", Size(1500, "ml"), "Laundry Liquid 1.5 l") == (
+        "Laundry Liquid 1.5 l"
+    )
+
+
+def test_with_size_writes_the_size_when_the_store_name_has_none():
+    assert with_size("Deterjan 2,5 L", Size(1500, "ml")) == "Deterjan 1.5 l"
+    assert with_size("Krem 50 ml", Size(30, "ml")) == "Krem 30 ml"
+    assert with_size("Tablet 60 adet", Size(30, "pcs")) == "Tablet 30 pcs"
+
+
+def test_with_size_leaves_matching_or_sizeless_names_alone():
+    assert with_size("Tonik 150 ml", Size(150, "ml"), "Toner 150ML") == "Tonik 150 ml"
+    assert with_size("My toner", Size(150, "ml")) == "My toner"
+    assert with_size("Tonik 150 ml", None) == "Tonik 150 ml"

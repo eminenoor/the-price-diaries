@@ -40,6 +40,11 @@ export const useSetTarget = () =>
   useInvalidating(({ id, target }: { id: number; target: number }) =>
     api.update(id, { target_price: target }),
   );
+/** One name for the product at every store; "" goes back to the stores' names. */
+export const useSetDisplayName = () =>
+  useInvalidating(({ id, name }: { id: number; name: string }) =>
+    api.update(id, { display_name: name }),
+  );
 /** Group a product with the same product at another store. */
 export const useLink = () =>
   useInvalidating(({ id, otherId }: { id: number; otherId: number }) => api.link(id, otherId));

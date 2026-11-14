@@ -78,7 +78,10 @@ export interface Offer {
 export interface Product {
   id: number;
   url: string;
+  /** The name to show: the user's, or the most complete store name in its group. */
   name: string;
+  /** This store's own name for it. */
+  listing_name: string;
   /** From the store page, or set by the user; null if unknown. */
   brand: string | null;
   store: string;
@@ -146,6 +149,8 @@ export interface ProductChanges extends Partial<NewProduct> {
   brand?: string;
   /** As written on the pack: "150 ml", "1,5 L". "" removes it, so checks won't fill it in. */
   size?: string;
+  /** Shown at every store in the group. "" goes back to the most complete store name. */
+  display_name?: string;
 }
 
 export class ApiError extends Error {

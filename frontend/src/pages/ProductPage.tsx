@@ -15,6 +15,7 @@ import {
   useProduct,
   useRemoveProduct,
   useSetBrand,
+  useSetDisplayName,
   useSetSize,
   useSetTarget,
   useStores,
@@ -157,6 +158,7 @@ export function ProductPage() {
           target={product.target_price}
           showValue={product.history.length < 2}
         />
+        <NameEditor id={product.id} name={product.name} grouped={product.elsewhere.length > 0} />
         <BrandEditor id={product.id} brand={product.brand} />
         <SizeEditor id={product.id} size={product.size} />
         <p className="room__stop">
@@ -166,6 +168,51 @@ export function ProductPage() {
         </p>
       </div>
     </article>
+  );
+}
+
+/**
+ * The name is the most complete one the stores use; it can be changed. In a group the
+ * new name is shown for the product at every store.
+ */
+function NameEditor({ id, name, grouped }: { id: number; name: string; grouped: boolean }) {
+  const setName = useSetDisplayName();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(name);
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    await setName.mutateAsync({ id, name: value.trim() });
+    setEditing(false);
+  }
+
+  if (!editing)
+    return (
+      <button
+        type="button"
+        className="text-button"
+        onClick={() => {
+          setValue(name);
+          setEditing(true);
+        }}
+      >
+        Change name
+      </button>
+    );
+  return (
+    <form className="edit-form" onSubmit={save}>
+      <label>
+        Name
+        <input value={value} maxLength={200} onChange={(e) => setValue(e.target.value)} autoFocus />
+      </label>
+      <button className="paper-button paper-button--mustard" type="submit" disabled={setName.isPending}>
+        {value.trim() ? "Save name" : "Use the store's name"}
+      </button>
+      <button type="button" className="text-button" onClick={() => setEditing(false)}>
+        Cancel
+      </button>
+      {grouped && <span className="edit-form__note">Shown for this product at every store.</span>}
+    </form>
   );
 }
 

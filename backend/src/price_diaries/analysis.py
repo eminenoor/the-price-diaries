@@ -230,3 +230,16 @@ def cheaper_elsewhere(here: Offer, others: list[Offer], today: date) -> tuple[Of
         if best is None or amount > best[1]:
             best = (there, amount)
     return best
+
+
+def pick_display_name(names: list[str]) -> str:
+    """The most complete of several stores' names for one product.
+
+    Most distinct words wins ("Some By Mi AHA BHA PHA Miracle Toner 150 ml" over
+    "AHA BHA PHA Miracle Toner"), then the longer name, then the first one given.
+    """
+
+    def words(name: str) -> int:
+        return len({w.strip(".,;:()-").casefold() for w in name.split()} - {""})
+
+    return max(names, key=lambda n: (words(n), len(n), -names.index(n)))

@@ -46,7 +46,15 @@ class ProductCreate(BaseModel):
 
 
 class ProductUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=200)
+    name: str | None = Field(
+        default=None, min_length=1, max_length=200, description="The store's name for it."
+    )
+    display_name: str | None = Field(
+        default=None,
+        max_length=200,
+        description="The name shown for it at every store in its group. "
+        '"" or null goes back to the most complete store name.',
+    )
     brand: str | None = Field(
         default=None, max_length=100, description='"" means no brand; checks won\'t fill it in.'
     )
@@ -102,7 +110,10 @@ class ElsewhereNote(BaseModel):
 class ProductOut(BaseModel):
     id: int
     url: str
-    name: str
+    name: str = Field(
+        description="The name to show: the user's, or the most complete store name in its group."
+    )
+    listing_name: str = Field(description="This store's own name for it.")
     brand: str | None = Field(
         default=None, description="From the store page or set by the user; None if unknown."
     )

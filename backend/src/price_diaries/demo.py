@@ -41,6 +41,9 @@ class DemoProduct:
 
 TONER_GTIN = "08809598452350"
 
+# Add new products at the END. Every product draws from one random stream in this
+# order, so a product inserted in the middle changes the history of every product
+# after it (and with it, which windows are lit).
 DEMO_PRODUCTS = [
     DemoProduct(
         "AHA BHA PHA 30 Days Miracle Toner 150 ml",
@@ -50,17 +53,6 @@ DEMO_PRODUCTS = [
         950,
         "deal",
         0.52,
-        brand="Some By Mi",
-        gtin=TONER_GTIN,
-    ),
-    # The same toner at another store, found by its barcode: cheaper there today.
-    DemoProduct(
-        "Some By Mi AHA BHA PHA Miracle Toner 150 ml",
-        "watsons",
-        "Skincare",
-        "Toners",
-        340,
-        "steady",
         brand="Some By Mi",
         gtin=TONER_GTIN,
     ),
@@ -110,16 +102,27 @@ DEMO_PRODUCTS = [
     DemoProduct(
         "Laundry Liquid 2.5 l", "rossmann", "Cleaning", "Laundry", 289, "fake", link="laundry"
     ),
-    # A smaller bottle elsewhere, linked by hand: cheaper per ml, so cheaper for 2.5 l too.
-    DemoProduct(
-        "Laundry Liquid 1.5 l", "trendyol", "Cleaning", "Laundry", 165, "steady", link="laundry"
-    ),
     DemoProduct("Dishwasher Tablets 60 pcs", "amazon", "Cleaning", "Kitchen", 499, "waiting"),
     DemoProduct(
         "Vitamin D3 1000 IU, 90 tablets", "gratis", "Supplements", "Vitamins", 275, "steady"
     ),
     DemoProduct(
         "Magnesium Bisglycinate 120 caps", "watsons", "Supplements", "Minerals", 389, "deal"
+    ),
+    # The same toner at another store, found by its barcode: cheaper there today.
+    DemoProduct(
+        "Some By Mi AHA BHA PHA Miracle Toner 150 ml",
+        "watsons",
+        "Skincare",
+        "Toners",
+        340,
+        "steady",
+        brand="Some By Mi",
+        gtin=TONER_GTIN,
+    ),
+    # A smaller bottle elsewhere, linked by hand: cheaper per ml, so cheaper for 2.5 l too.
+    DemoProduct(
+        "Laundry Liquid 1.5 l", "trendyol", "Cleaning", "Laundry", 165, "steady", link="laundry"
     ),
 ]
 

@@ -6,6 +6,7 @@ from price_diaries.analysis import (
     UnitPrice,
     cheaper_elsewhere,
     is_fake_sale,
+    pick_display_name,
     rank_offers,
     saving,
     summarize,
@@ -187,3 +188,20 @@ def test_cheaper_elsewhere_ignores_tiny_savings_and_itself():
 
 def test_cheaper_elsewhere_skips_what_costs_more():
     assert cheaper_elsewhere(offer(1, 300), [offer(2, 320)], TODAY.date()) is None
+
+
+def test_display_name_with_the_most_words_wins():
+    names = ["AHA BHA PHA Miracle Toner", "Some By Mi AHA BHA PHA Miracle Toner 150 ml"]
+    assert pick_display_name(names) == names[1]
+
+
+def test_display_name_counts_distinct_words_then_length():
+    # Repeated words and punctuation don't make a name more complete.
+    assert pick_display_name(["Toner toner, TONER 150 ml", "Calming Toner 150 ml"]) == (
+        "Calming Toner 150 ml"
+    )
+    assert pick_display_name(["Rice Foam 150 ml", "Rice Foams 150 ml"]) == "Rice Foams 150 ml"
+
+
+def test_display_name_ties_go_to_the_first():
+    assert pick_display_name(["Serum 30 ml", "Serum 30 mL"]) == "Serum 30 ml"

@@ -5,7 +5,7 @@ def test_demo_covers_every_state_and_floor(client):
     with client.app.state.db.session() as session:
         assert seed_demo(session) == len(DEMO_PRODUCTS)
 
-    products = {p["name"]: p for p in client.get("/api/products").json()}
+    products = {p["listing_name"]: p for p in client.get("/api/products").json()}
     categories = {c["id"]: c for c in client.get("/api/categories").json()}
 
     floors = set()
@@ -47,10 +47,20 @@ def test_demo_covers_every_state_and_floor(client):
 def test_demo_has_the_same_product_at_two_stores(client):
     with client.app.state.db.session() as session:
         seed_demo(session)
-    products = {p["name"]: p for p in client.get("/api/products").json()}
+    products = {p["listing_name"]: p for p in client.get("/api/products").json()}
 
     toner = products["AHA BHA PHA 30 Days Miracle Toner 150 ml"]["cheaper_elsewhere"]
     assert toner["store_name"] == "Watsons" and toner["saving"] > 0
     # A bigger bottle compared per ml: 1,5 L for ₺165 is ₺275 for 2,5 L.
     laundry = products["Laundry Liquid 2.5 l"]["cheaper_elsewhere"]
     assert laundry["store_name"] == "Trendyol" and laundry["saving"] == 14
+
+
+def test_new_demo_products_dont_change_the_old_ones(client):
+    """Products share one random stream, so new ones go at the end of the list. Inserting one
+    in the middle once turned the Niacinamide toner from "lowest ever" into "no change"."""
+    with client.app.state.db.session() as session:
+        seed_demo(session)
+    products = {p["listing_name"]: p for p in client.get("/api/products").json()}
+    toner = products["Niacinamide 10% Toner 200 ml"]["summary"]
+    assert toner["is_all_time_low"] and toner["highest"] == 272.08

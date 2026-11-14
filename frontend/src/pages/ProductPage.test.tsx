@@ -44,6 +44,7 @@ export const detail = (overrides: Partial<ProductDetail> = {}): ProductDetail =>
   size: null,
   unit_price: null,
   gtin: null,
+  listing_name: "Store name",
   cheaper_elsewhere: null,
   sparkline: [],
   history: [
@@ -329,7 +330,10 @@ describe("ProductPage elsewhere", () => {
     const calls = renderProduct(detail(), [other]);
     const section = await screen.findByRole("region", { name: "elsewhere" });
     expect(section).toHaveTextContent("Not tracked at another store yet.");
-    const select = await within(section).findByRole("combobox", { name: "Same product at" });
+    // The form stays out of the way until asked for.
+    expect(within(section).queryByRole("combobox")).not.toBeInTheDocument();
+    fireEvent.click(await within(section).findByRole("button", { name: "Link another store" }));
+    const select = within(section).getByRole("combobox", { name: "Same product at" });
     fireEvent.change(select, { target: { value: "12" } });
     fireEvent.click(within(section).getByRole("button", { name: "Link products" }));
     await waitFor(() =>
@@ -341,6 +345,46 @@ describe("ProductPage elsewhere", () => {
     renderProduct(twoStores(), [detail({ id: 8 }), detail({ id: 9 })]);
     const section = await screen.findByRole("region", { name: "elsewhere" });
     await screen.findAllByRole("listitem");
+    expect(within(section).queryByRole("button", { name: "Link another store" })).not.toBeInTheDocument();
+  });
+
+  it("closes the link form again on cancel", async () => {
+    renderProduct(detail(), [detail({ id: 12, store: "watsons" })]);
+    const section = await screen.findByRole("region", { name: "elsewhere" });
+    fireEvent.click(await within(section).findByRole("button", { name: "Link another store" }));
+    fireEvent.click(within(section).getByRole("button", { name: "Cancel" }));
     expect(within(section).queryByRole("combobox")).not.toBeInTheDocument();
+    expect(within(section).getByRole("button", { name: "Link another store" })).toBeInTheDocument();
+  });
+
+  it("lists each store's own name to link", async () => {
+    renderProduct(detail(), [detail({ id: 12, store: "watsons", listing_name: "Watsons title" })]);
+    const section = await screen.findByRole("region", { name: "elsewhere" });
+    fireEvent.click(await within(section).findByRole("button", { name: "Link another store" }));
+    expect(within(section).getByRole("option", { name: "watsons: Watsons title" })).toBeInTheDocument();
+  });
+});
+
+describe("ProductPage name", () => {
+  it("renames the product for every store in its group", async () => {
+    const calls = renderProduct(detail({ elsewhere: [] }));
+    fireEvent.click(await screen.findByRole("button", { name: "Change name" }));
+    const input = screen.getByRole("textbox", { name: "Name" });
+    expect(input).toHaveValue("AHA BHA PHA 30 Days Miracle Toner 150 ml");
+    fireEvent.change(input, { target: { value: "My toner" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save name" }));
+    await waitFor(() =>
+      expect(calls).toContainEqual({ method: "PATCH", path: "/products/7", body: { display_name: "My toner" } }),
+    );
+  });
+
+  it("goes back to the store's name when cleared", async () => {
+    const calls = renderProduct(detail());
+    fireEvent.click(await screen.findByRole("button", { name: "Change name" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: " " } });
+    fireEvent.click(screen.getByRole("button", { name: "Use the store's name" }));
+    await waitFor(() =>
+      expect(calls).toContainEqual({ method: "PATCH", path: "/products/7", body: { display_name: "" } }),
+    );
   });
 });

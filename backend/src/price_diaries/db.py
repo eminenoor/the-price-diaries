@@ -72,6 +72,9 @@ class Product(Base):
     # unlinked it, so checks leave the group alone.
     group_key: Mapped[str | None] = mapped_column(String(24), index=True)
     group_source: Mapped[str | None] = mapped_column(String(7))
+    # A name the user gave this product, shared by every product in its group. None means
+    # the app picks the most complete store name in the group.
+    display_name: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     prices: Mapped[list[PricePoint]] = relationship(

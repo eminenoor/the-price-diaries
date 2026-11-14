@@ -407,3 +407,66 @@ def test_unchecked_products_are_left_out_of_elsewhere(client, fake_pages):
     watsons = add_product(client, url=WATSONS_URL, name="Serum").json()["id"]
     client.post(f"/api/products/{gratis}/link", json={"other_id": watsons})
     assert client.get(f"/api/products/{gratis}").json()["elsewhere"] == []
+
+
+def test_group_shares_the_most_complete_name(client, fake_pages):
+    gratis, watsons = two_stores(client, fake_pages)
+    client.patch(f"/api/products/{watsons}", json={"name": "Some By Mi Miracle Toner 150 ml"})
+    products = {p["id"]: p for p in client.get("/api/products").json()}
+    assert (
+        products[gratis]["name"] == products[watsons]["name"] == "Some By Mi Miracle Toner 150 ml"
+    )
+    assert products[gratis]["listing_name"] == "Toner 150 ml"
+    # The elsewhere list keeps each store's own name.
+    elsewhere = client.get(f"/api/products/{gratis}").json()["elsewhere"]
+    assert elsewhere[0]["name"] == "Some By Mi Miracle Toner 150 ml"
+    assert client.get(f"/api/products/{watsons}").json()["elsewhere"][0]["name"] == "Toner 150 ml"
+
+
+def test_renaming_a_group_renames_every_store(client, fake_pages):
+    gratis, watsons = two_stores(client, fake_pages)
+    renamed = client.patch(f"/api/products/{gratis}", json={"display_name": "  My  toner "})
+    assert renamed.json()["name"] == "My toner"
+    assert client.get(f"/api/products/{watsons}").json()["name"] == "My toner"
+    # Store names, and the sizes read from them, are untouched.
+    assert client.get(f"/api/products/{watsons}").json()["listing_name"] == "Toner 150 ml"
+    assert client.get(f"/api/products/{watsons}").json()["size"]["amount"] == 150
+    # "" goes back to the most complete store name.
+    client.patch(f"/api/products/{watsons}", json={"display_name": ""})
+    assert client.get(f"/api/products/{gratis}").json()["name"] == "Toner 150 ml"
+
+
+def test_unlinked_product_gets_its_own_name_back(client, fake_pages):
+    gratis, watsons = two_stores(client, fake_pages)
+    client.patch(f"/api/products/{gratis}", json={"display_name": "My toner"})
+    client.delete(f"/api/products/{watsons}/link")
+    assert client.get(f"/api/products/{watsons}").json()["name"] == "Toner 150 ml"
+    assert client.get(f"/api/products/{gratis}").json()["name"] == "My toner"
+
+
+def test_linked_product_takes_the_group_name(client, fake_pages):
+    gratis, watsons = two_stores(client, fake_pages, gtin="036000291452")
+    client.patch(f"/api/products/{watsons}", json={"display_name": "Watsons only"})
+    client.patch(f"/api/products/{gratis}", json={"display_name": "My toner"})
+    client.post(f"/api/products/{watsons}/link", json={"other_id": gratis})
+    assert client.get(f"/api/products/{watsons}").json()["name"] == "My toner"
+
+
+def test_renaming_a_single_product(client):
+    product_id = add_product(client, name="Serum 30 ml").json()["id"]
+    renamed = client.patch(f"/api/products/{product_id}", json={"display_name": "Night serum"})
+    assert renamed.json()["name"] == "Night serum"
+    assert renamed.json()["listing_name"] == "Serum 30 ml"
+
+
+def test_shared_name_keeps_each_stores_size(client, fake_pages):
+    """A group can hold different pack sizes: the shared name never shows the wrong one."""
+    gratis, watsons = two_stores(client, fake_pages, gtin="036000291452")
+    client.patch(f"/api/products/{gratis}", json={"name": "Laundry Liquid 2.5 l"})
+    client.patch(f"/api/products/{watsons}", json={"name": "Laundry Liquid 1.5 l"})
+    client.post(f"/api/products/{watsons}/link", json={"other_id": gratis})
+    products = {p["id"]: p["name"] for p in client.get("/api/products").json()}
+    assert products == {gratis: "Laundry Liquid 2.5 l", watsons: "Laundry Liquid 1.5 l"}
+    # A name the user picks gets each store's size too.
+    client.patch(f"/api/products/{gratis}", json={"display_name": "My liquid 2,5 L"})
+    assert client.get(f"/api/products/{watsons}").json()["name"] == "My liquid 1.5 l"

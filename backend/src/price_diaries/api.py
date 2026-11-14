@@ -20,6 +20,7 @@ from price_diaries import migrate
 from price_diaries.analysis import (
     Offer,
     cheaper_elsewhere,
+    pick_display_name,
     price_anomalies,
     rank_offers,
     saving,
@@ -29,7 +30,7 @@ from price_diaries.analysis import (
 from price_diaries.checker import check_all, check_product, update_size
 from price_diaries.db import Category, Database, Product
 from price_diaries.fetcher import Fetcher
-from price_diaries.parsers import STORES, parse_size
+from price_diaries.parsers import STORES, Size, parse_size, with_size
 from price_diaries.scheduler import build_scheduler
 from price_diaries.schemas import (
     AnomalyOut,
@@ -216,6 +217,18 @@ def _cheaper_elsewhere(
     )
 
 
+def _display_name(product: Product, others: Sequence[Product]) -> str:
+    """One name for the product at every store: the user's, or the most complete store name."""
+    members = sorted([product, *others], key=lambda p: p.id)
+    chosen = [p.display_name for p in members if p.display_name]
+    name = chosen[0] if chosen else pick_display_name([p.name for p in members])
+    # Stores in a group can sell different sizes: keep this one's own size in the name.
+    size = None
+    if product.size_amount is not None and product.size_unit is not None:
+        size = Size(product.size_amount, product.size_unit)  # type: ignore[arg-type]
+    return with_size(name, size, product.name)
+
+
 def _to_out(product: Product, use_member: bool, others: Sequence[Product] = ()) -> ProductOut:
     history = _history(product, use_member)
     summary = summarize(history)
@@ -231,7 +244,8 @@ def _to_out(product: Product, use_member: bool, others: Sequence[Product] = ()) 
     return ProductOut(
         id=product.id,
         url=product.url,
-        name=product.name,
+        name=_display_name(product, others),
+        listing_name=product.name,
         brand=product.brand or None,  # "" (removed by the user) is no brand too
         store=product.store,
         category_id=product.category_id,
@@ -343,7 +357,7 @@ def _register_routes(app: FastAPI) -> None:
         for p in products:
             if p.group_key is not None:
                 groups.setdefault(p.group_key, []).append(p)
-        return [
+        outs = [
             _to_out(
                 p,
                 settings.use_member_prices,
@@ -351,6 +365,7 @@ def _register_routes(app: FastAPI) -> None:
             )
             for p in products
         ]
+        return sorted(outs, key=lambda o: o.name.casefold())
 
     @app.post("/api/products", status_code=status.HTTP_201_CREATED)
     def create_product(
@@ -394,6 +409,11 @@ def _register_routes(app: FastAPI) -> None:
         if "brand" in changes:
             # A blank brand is kept as "", so the next check doesn't fill it in again.
             changes["brand"] = " ".join((changes["brand"] or "").split())
+        if "display_name" in changes:
+            # Shared by the whole group; "" goes back to the most complete store name.
+            display_name = " ".join((changes.pop("display_name") or "").split()) or None
+            for member in [product, *_group(session, product)]:
+                member.display_name = display_name
         size_text = (changes.pop("size", None) or "").strip()
         if "size" in body.model_fields_set:
             size = parse_size(size_text)
@@ -431,6 +451,7 @@ def _register_routes(app: FastAPI) -> None:
         if other.group_key is None:
             other.group_key, other.group_source = f"user:{other.id}", "user"
         product.group_key, product.group_source = other.group_key, "user"
+        product.display_name = None  # take the new group's name
         session.commit()
         return _to_detail(session, product, settings.use_member_prices)
 
@@ -439,6 +460,7 @@ def _register_routes(app: FastAPI) -> None:
         """Take this product out of its group. Checks won't put it back by barcode."""
         product = _get_product(session, product_id)
         product.group_key, product.group_source = None, "user"
+        product.display_name = None  # the group's name stays with the group
         session.commit()
 
     @app.delete("/api/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)

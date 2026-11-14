@@ -51,11 +51,12 @@ function OfferRow({ offer }: { offer: Offer }) {
   );
 }
 
-/** Pick another tracked product and group it with this one. */
+/** Pick another tracked product and group it with this one. Hidden until asked for. */
 function LinkForm({ product }: { product: ProductDetail }) {
   const { data: products = [] } = useProducts();
   const { data: stores = [] } = useStores();
   const link = useLink();
+  const [open, setOpen] = useState(false);
   const [otherId, setOtherId] = useState("");
 
   const grouped = new Set(product.elsewhere.map((o) => o.product_id));
@@ -68,8 +69,15 @@ function LinkForm({ product }: { product: ProductDetail }) {
     if (!otherId) return;
     await link.mutateAsync({ id: product.id, otherId: Number(otherId) });
     setOtherId("");
+    setOpen(false);
   }
 
+  if (!open)
+    return (
+      <button type="button" className="text-button" onClick={() => setOpen(true)}>
+        Link another store
+      </button>
+    );
   return (
     <form className="edit-form" onSubmit={save}>
       <label>
@@ -78,7 +86,7 @@ function LinkForm({ product }: { product: ProductDetail }) {
           <option value="">choose a product</option>
           {candidates.map((p) => (
             <option key={p.id} value={p.id}>
-              {storeName(p.store)}: {p.name}
+              {storeName(p.store)}: {p.listing_name}
             </option>
           ))}
         </select>
@@ -89,6 +97,9 @@ function LinkForm({ product }: { product: ProductDetail }) {
         disabled={!otherId || link.isPending}
       >
         Link products
+      </button>
+      <button type="button" className="text-button" onClick={() => setOpen(false)}>
+        Cancel
       </button>
     </form>
   );
