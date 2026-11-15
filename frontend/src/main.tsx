@@ -13,6 +13,7 @@ import "./styles/night.css";
 import "./styles/quiet.css";
 import "./styles/room.css";
 import "./styles/note.css";
+import "./styles/notes.css";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";

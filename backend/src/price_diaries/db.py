@@ -17,6 +17,8 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 
+from price_diaries.analysis import Offer
+
 
 class Base(DeclarativeBase):
     pass
@@ -83,6 +85,20 @@ class Product(Base):
         order_by="PricePoint.checked_at",
     )
 
+    def offer(self, use_member_prices: bool) -> Offer | None:
+        """The latest price you'd pay at this store, or None before the first check."""
+        if not self.prices:
+            return None
+        latest = self.prices[-1]
+        return Offer(
+            product_id=self.id,
+            price=latest.effective_price(use_member_prices),
+            checked_at=latest.checked_at,
+            in_stock=latest.in_stock,
+            size_amount=self.size_amount,
+            size_unit=self.size_unit,
+        )
+
 
 class PricePoint(Base):
     __tablename__ = "price_points"
@@ -103,6 +119,44 @@ class PricePoint(Base):
         if use_member_prices and self.member_price is not None:
             return self.member_price
         return self.price
+
+
+class Notification(Base):
+    """A note in the inbox: something worth knowing about a product after a check."""
+
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), index=True
+    )
+    # "target", "lowest", "fake_sale", "cheaper" or "back_in_stock"
+    kind: Mapped[str] = mapped_column(String(16))
+    old_price: Mapped[float | None] = mapped_column(Float)
+    new_price: Mapped[float | None] = mapped_column(Float)
+    # For "cheaper": the store that sells it for less (new_price is its price for this size).
+    other_store: Mapped[str | None] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    read_at: Mapped[datetime | None] = mapped_column()
+
+
+class AlertState(Base):
+    """Whether an alert's condition held at the last check, so each event is sent once.
+
+    A note goes out only when the condition turns from false to true: the alert-price
+    note again only after the price went back above the alert price and came down again.
+    """
+
+    __tablename__ = "alert_states"
+
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    active: Mapped[bool] = mapped_column()
+    # For "lowest": the price the next new-low note is measured from. The price of the last
+    # new-low note, or the lowest price when notes started for this product.
+    price: Mapped[float | None] = mapped_column(Float)
 
 
 def ensure_sqlite_dir(url: str) -> None:

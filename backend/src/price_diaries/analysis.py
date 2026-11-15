@@ -7,6 +7,7 @@ import statistics
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Literal
 
 History = list[tuple[datetime, float]]  # sorted oldest -> newest
 
@@ -230,6 +231,113 @@ def cheaper_elsewhere(here: Offer, others: list[Offer], today: date) -> tuple[Of
         if best is None or amount > best[1]:
             best = (there, amount)
     return best
+
+
+# --- alerts ----------------------------------------------------------------------------
+
+AlertKind = Literal["target", "lowest", "fake_sale", "cheaper", "back_in_stock"]
+ALERT_KINDS: tuple[AlertKind, ...] = ("target", "lowest", "fake_sale", "cheaper", "back_in_stock")
+
+
+@dataclass(frozen=True)
+class Reading:
+    """One check, at the price you'd actually pay."""
+
+    checked_at: datetime
+    price: float
+    in_stock: bool = True
+
+
+@dataclass(frozen=True)
+class Signal:
+    """Whether an alert's condition holds after the latest check, and the prices to report."""
+
+    active: bool
+    old_price: float | None = None
+    new_price: float | None = None
+    other_store: str | None = None
+
+
+# A new lowest price is only worth a note when it's at least ₺1 and 1% below the low mark
+# (see ``next_low_mark``), so a few kuruş of noise doesn't send one.
+MIN_LOW_DROP = Decimal("1.00")
+MIN_LOW_DROP_SHARE = Decimal("0.01")
+
+
+def is_new_low(price: float, low_mark: float) -> bool:
+    """``price`` beats ``low_mark`` by at least ₺1 and at least 1% (in exact kuruş)."""
+    drop = Decimal(str(low_mark)) - Decimal(str(price))
+    return drop >= MIN_LOW_DROP and drop >= Decimal(str(low_mark)) * MIN_LOW_DROP_SHARE
+
+
+def next_low_mark(readings: list[Reading], low_mark: float | None, new_low: bool) -> float:
+    """The price the next new-low note is measured from, after the latest of ``readings``.
+
+    It's the price of the last new-low note, or, before the first one, the lowest price
+    when notes started for this product. Small drops that don't send a note leave it
+    where it is, so slow drops still add up to a note.
+    """
+    if low_mark is None:
+        return min(r.price for r in readings)
+    return readings[-1].price if new_low else low_mark
+
+
+def alert_signals(
+    readings: list[Reading],
+    target: float | None,
+    cheaper: tuple[str, float] | None = None,
+    low_mark: float | None = None,
+) -> dict[AlertKind, Signal]:
+    """Every alert's condition after the latest of ``readings`` (oldest first, not empty).
+
+    ``cheaper`` is the other store that sells it for less today and its price for this
+    product's size (see ``cheaper_elsewhere``), or None. ``low_mark`` is what a new
+    lowest price has to beat (see ``next_low_mark`` and ``is_new_low``); None (no mark
+    yet) means no new-low note.
+    """
+    current = readings[-1]
+    previous = readings[-2] if len(readings) > 1 else None
+    old = previous.price if previous else None
+
+    def signal(active: bool) -> Signal:
+        return Signal(active, old, current.price) if active else Signal(False)
+
+    return {
+        # Out of stock isn't worth a note; when it's back, still under target, it is.
+        "target": signal(
+            target is not None and current.in_stock and round(current.price, 2) <= target
+        ),
+        "lowest": signal(low_mark is not None and is_new_low(current.price, low_mark)),
+        "fake_sale": signal(is_fake_sale([(r.checked_at, r.price) for r in readings])),
+        "cheaper": (
+            Signal(True, current.price, cheaper[1], cheaper[0]) if cheaper else Signal(False)
+        ),
+        "back_in_stock": signal(
+            previous is not None and current.in_stock and not previous.in_stock
+        ),
+    }
+
+
+def fresh_alerts(
+    signals: dict[AlertKind, Signal], previous: dict[AlertKind, bool], first_check: bool
+) -> list[AlertKind]:
+    """The alerts to send now: those whose condition just turned from false to true.
+
+    A new lowest price is different: every one is its own event, so two drops in a row
+    are two notes (the same low price again is never "new", so it can't repeat).
+
+    Nothing on a product's first check, and nothing for an alert with no previous state
+    (just after upgrading, say): its state is recorded, and only a later change counts.
+    """
+    if first_check:
+        return []
+    return [
+        kind
+        for kind in ALERT_KINDS
+        if signals[kind].active
+        and kind in previous
+        and (kind == "lowest" or previous[kind] is False)
+    ]
 
 
 def pick_display_name(names: list[str]) -> str:

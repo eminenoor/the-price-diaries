@@ -10,25 +10,36 @@ from apscheduler.triggers.cron import CronTrigger
 from price_diaries.checker import check_all
 from price_diaries.db import Database
 from price_diaries.fetcher import Fetcher
+from price_diaries.notifications import Notifier, make_notifier, notify_after_check
 from price_diaries.settings import Settings
 
 log = logging.getLogger(__name__)
 
 
-async def run_daily_check(db: Database, settings: Settings) -> None:
+async def run_daily_check(
+    db: Database, settings: Settings, notifier: Notifier | None = None
+) -> None:
+    notifier = notifier or make_notifier(settings)
     async with Fetcher(settings.min_delay, settings.max_delay, settings.request_timeout) as f:
         with db.session() as session:
             outcomes = await check_all(session, f, settings.browser_fallback)
+            checked = [o.product_id for o in outcomes if o.ok]
+            notes = await notify_after_check(session, checked, settings, notifier)
     failed = sum(not o.ok for o in outcomes)
-    log.info("Daily check finished: %d products, %d failed", len(outcomes), failed)
+    log.info(
+        "Daily check finished: %d products, %d failed, %d new notes",
+        len(outcomes),
+        failed,
+        len(notes),
+    )
 
 
-def build_scheduler(db: Database, settings: Settings) -> AsyncIOScheduler:
+def build_scheduler(db: Database, settings: Settings, notifier: Notifier) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
         run_daily_check,
         CronTrigger(hour=settings.check_hour, minute=settings.check_minute),
-        args=[db, settings],
+        args=[db, settings, notifier],
         id="daily-check",
         coalesce=True,  # if the laptop was asleep, run once, not once per missed day
         misfire_grace_time=12 * 60 * 60,

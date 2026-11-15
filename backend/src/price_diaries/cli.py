@@ -1,4 +1,4 @@
-"""Command line: `price-diaries serve | check | migrate | demo`."""
+"""Command line: `price-diaries serve | check | migrate | demo | inspect | notify`."""
 
 from __future__ import annotations
 
@@ -28,6 +28,9 @@ def main(argv: list[str] | None = None) -> int:
     inspect.add_argument("url")
     inspect.add_argument("--browser", action="store_true", help="also load the page in Chromium")
     inspect.add_argument("--save", metavar="FILE", help="save the downloaded HTML to a file")
+    notify = sub.add_parser("notify", help="desktop notifications")
+    notify_sub = notify.add_subparsers(dest="notify_command", required=True)
+    notify_sub.add_parser("test", help="send one test notification")
 
     args = parser.parse_args(argv)
     logging.basicConfig(
@@ -46,6 +49,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "inspect":
         return asyncio.run(_inspect(args.url, args.browser, args.save))
+
+    if args.command == "notify":
+        return asyncio.run(_notify_test(settings.desktop_notifications))
 
     migrate.upgrade(settings.database_url)
     if args.command == "migrate":
@@ -96,6 +102,22 @@ async def _inspect(url: str, browser: bool, save: str | None) -> int:
 
     if store.member_labels and not browser and not member_found:
         print("\nNo member price? It may be added by JavaScript. Try again with --browser.")
+    return 0
+
+
+async def _notify_test(enabled: bool) -> int:
+    from price_diaries import notifications
+
+    if not enabled:
+        print("Desktop notifications are off. Set PD_DESKTOP_NOTIFICATIONS=true to turn them on.")
+        return 1
+    sent = await notifications.DesktopNotifications().send(
+        "Test notification", "Notes about your prices will appear like this."
+    )
+    if not sent:
+        print("Couldn't show a desktop notification. The log above says why.")
+        return 1
+    print("Sent a test notification.")
     return 0
 
 

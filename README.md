@@ -22,6 +22,7 @@ Beauty retailers change prices almost daily. A common pattern is to raise a pric
 - **Unusual-rise detection** with a robust statistical method (see below), tuned per product.
 - **Loyalty-card prices.** When a store shows a member price (such as Gratis Gold & Platinum), that's the price tracked, with the regular price shown beside it.
 - **Alert prices.** Set the price you're willing to pay and see when it's reached.
+- **Notifications.** Notes in the app and on your desktop when a price reaches your alert price, hits a new low, turns out to be a fake sale, is cheaper elsewhere, or is back in stock.
 - **Floors and rooms.** Group products into floors (Skincare, Pantry, Cleaning, Supplements, or your own) and rooms inside them (Toners, Coffee…).
 - **Two ways to look.** A night view where good deals light up their window, and a quiet daylight mode with just the facts.
 - **Full history** for every product: lowest, highest, 30-day low, and a chart of every check.
@@ -125,6 +126,20 @@ cd ../backend && uv run price-diaries serve
 
 While the server runs, prices are checked every day at 09:17. If your computer was asleep at that time, the check runs once when it wakes up. To check without keeping the server open, schedule `uv run price-diaries check` with cron (macOS/Linux) or Task Scheduler (Windows).
 
+### Notifications
+
+After each check, The Price Diaries leaves a note when something is worth knowing:
+
+- the price is at or under your alert price
+- a new lowest price, at least ₺1 and 1% below the last new-low note (or the lowest price when notes started), so slow small drops still add up
+- a fake sale
+- the same product is cheaper at another store (compared per ml, g or piece)
+- the product is back in stock
+
+Notes appear under **Notes** in the header, where you can open the product or mark them as read. While the app is running they also show up as desktop notifications. Each note is sent once: the alert-price note, for example, comes again only after the price has gone back above your alert price and then come down again. A product's first check never sends one. Everything stays on your computer.
+
+To turn off desktop notifications, set `PD_DESKTOP_NOTIFICATIONS=false`; notes still appear in the app. To check that they work, run `uv run price-diaries notify test`. If your system can't show them, this is logged once and the app carries on.
+
 ### Configuration
 
 Copy `backend/.env.example` to `backend/.env` to change the check time, delays, or database location. If you don't have a store's loyalty card, set `PD_USE_MEMBER_PRICES=false` to track regular prices instead.
@@ -137,6 +152,7 @@ Copy `backend/.env.example` to `backend/.env` to change the check time, delays, 
 | `uv run price-diaries check` | Checks every product once, now |
 | `uv run price-diaries migrate` | Creates or updates the database |
 | `uv run price-diaries demo` | Adds demo products with fake history |
+| `uv run price-diaries notify test` | Sends one test desktop notification |
 | `uv run price-diaries inspect <url>` | Shows what every parsing strategy finds on a product page (add `--browser` to render JavaScript, `--save page.html` to keep the HTML) |
 | `uv run pytest` | Backend tests |
 | `npm test` | Frontend tests |
@@ -178,7 +194,6 @@ docs/               screenshots and design notes
 
 ## Roadmap
 
-- [ ] Notifications when a target price is reached (desktop or Telegram)
 - [ ] Compare the same product across stores
 - [ ] Import and export price history as CSV
 - [ ] Learn typical sale cycles per store to predict the next drop

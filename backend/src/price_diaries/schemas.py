@@ -183,6 +183,34 @@ class LinkCreate(BaseModel):
     other_id: int = Field(description="A product to group this one with.")
 
 
+NoteKind = Literal["target", "lowest", "fake_sale", "cheaper", "back_in_stock"]
+
+
+class NoteOut(BaseModel):
+    """A note in the inbox, about one product."""
+
+    id: int
+    kind: NoteKind
+    product_id: int
+    product_name: str
+    store: str
+    store_name: str
+    old_price: float | None = Field(
+        description="The price at the check before; for cheaper, the price here."
+    )
+    new_price: float | None = Field(
+        description="The new price; for cheaper, the other store's price for this size."
+    )
+    other_store_name: str | None = Field(description="For cheaper: the store that sells it.")
+    created_at: datetime
+    read: bool
+
+
+class NotesOut(BaseModel):
+    unread: int
+    notes: list[NoteOut] = Field(description="The latest notes, newest first.")
+
+
 class CheckResult(BaseModel):
     product_id: int
     ok: bool

@@ -3,7 +3,7 @@
  * where it hangs, which floor it belongs to and what the subtitle says.
  * No React here, so all of it is unit-tested in scene.test.ts.
  */
-import type { Category, Product, Summary } from "./api";
+import type { Category, NoteKind, Product, Summary } from "./api";
 import { formatChange, formatDate, formatPrice, pickFeature } from "./format";
 
 // --- window state -------------------------------------------------------------
@@ -610,4 +610,26 @@ export const WHITE = "#FFFFFF";
 /** Text colour for a label printed on a user-chosen floor colour. */
 export function inkOn(background: string): string {
   return contrast(background, INK) >= contrast(background, WHITE) ? INK : WHITE;
+}
+
+// --- notes ----------------------------------------------------------------------------
+
+/** What a note is about, in words: the label at the top of each note. */
+export const NOTE_LABELS: Record<NoteKind, string> = {
+  target: "alert price reached",
+  lowest: "lowest ever",
+  fake_sale: "fake sale",
+  cheaper: "cheaper elsewhere",
+  back_in_stock: "back in stock",
+};
+
+/** Mustard for good deals, rouge for warnings, plain paper for the rest. */
+export function noteTone(kind: NoteKind): "deal" | "warning" | "plain" {
+  if (kind === "fake_sale") return "warning";
+  return kind === "back_in_stock" ? "plain" : "deal";
+}
+
+/** The header's count: "2 new", or nothing when every note is read. */
+export function unreadLabel(unread: number): string {
+  return unread > 0 ? `${unread} new` : "";
 }

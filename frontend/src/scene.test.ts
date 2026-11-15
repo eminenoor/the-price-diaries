@@ -23,6 +23,9 @@ import {
   type NoteLayout,
   type NoteScene,
   type NoteToPlace,
+  NOTE_LABELS,
+  noteTone,
+  unreadLabel,
   type Point,
   windowState,
   type WindowKind,
@@ -465,5 +468,31 @@ describe("tokens meet WCAG AA", () => {
   it("focus ring stands out (3:1) in both modes", () => {
     expect(contrast(night.focus, night.bg)).toBeGreaterThanOrEqual(3);
     expect(contrast(quiet.focus, quiet.bg)).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("notes", () => {
+  it("names every kind of note in words", () => {
+    expect(NOTE_LABELS).toEqual({
+      target: "alert price reached",
+      lowest: "lowest ever",
+      fake_sale: "fake sale",
+      cheaper: "cheaper elsewhere",
+      back_in_stock: "back in stock",
+    });
+  });
+
+  it("keeps mustard for good deals and rouge for the fake-sale warning", () => {
+    expect(noteTone("lowest")).toBe("deal");
+    expect(noteTone("target")).toBe("deal");
+    expect(noteTone("cheaper")).toBe("deal");
+    expect(noteTone("fake_sale")).toBe("warning");
+    expect(noteTone("back_in_stock")).toBe("plain");
+  });
+
+  it("counts unread notes quietly, and says nothing when all are read", () => {
+    expect(unreadLabel(0)).toBe("");
+    expect(unreadLabel(1)).toBe("1 new");
+    expect(unreadLabel(12)).toBe("12 new");
   });
 });

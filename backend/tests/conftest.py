@@ -3,7 +3,7 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
-from price_diaries import api
+from price_diaries import api, notifications
 from price_diaries.api import create_app
 from price_diaries.fetcher import FetchError
 from price_diaries.settings import Settings
@@ -30,6 +30,28 @@ class FakeFetcher:
 
     async def get_rendered(self, url: str) -> str:
         return await self.get(url)
+
+
+class FakeDesktop:
+    """Stands in for desktop notifications. Records what would have been shown."""
+
+    sent: list[tuple[str, str]] = []
+    fail = False
+
+    async def send(self, title: str, message: str) -> bool:
+        if self.fail:
+            raise RuntimeError("toast failed")
+        self.sent.append((title, message))
+        return True
+
+
+@pytest.fixture(autouse=True)
+def desktop(monkeypatch) -> type[FakeDesktop]:
+    """No test ever shows a real desktop notification."""
+    monkeypatch.setattr(FakeDesktop, "sent", [])
+    monkeypatch.setattr(FakeDesktop, "fail", False)
+    monkeypatch.setattr(notifications, "DesktopNotifications", FakeDesktop)
+    return FakeDesktop
 
 
 @pytest.fixture

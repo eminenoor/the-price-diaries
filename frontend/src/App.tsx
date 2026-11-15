@@ -1,11 +1,13 @@
 import { Link, Route, Routes, useLocation } from "react-router-dom";
 
 import { SvgFilters } from "./components/SvgFilters";
-import { useCheckAll, useProducts } from "./hooks";
+import { useCheckAll, useNotes, useProducts } from "./hooks";
 import { useMode } from "./mode";
 import { AddPage } from "./pages/AddPage";
 import { IndexPage } from "./pages/IndexPage";
+import { NotesPage } from "./pages/NotesPage";
 import { ProductPage } from "./pages/ProductPage";
+import { unreadLabel } from "./scene";
 
 export function App() {
   return (
@@ -17,6 +19,7 @@ export function App() {
           <Route path="/" element={<IndexPage />} />
           <Route path="/add" element={<AddPage />} />
           <Route path="/products/:id" element={<ProductPage />} />
+          <Route path="/notes" element={<NotesPage />} />
           <Route
             path="*"
             element={
@@ -34,19 +37,29 @@ export function App() {
   );
 }
 
-function TopBar() {
+export function TopBar() {
   const checkAll = useCheckAll();
   const { data: products = [] } = useProducts();
+  const { data: notes } = useNotes();
   const { mode, setMode } = useMode();
-  const home = useLocation().pathname === "/";
+  const path = useLocation().pathname;
   const failed = checkAll.data?.filter((r) => !r.ok).length ?? 0;
+  const unread = unreadLabel(notes?.unread ?? 0);
 
   return (
     <header className="topbar">
-      <Link to="/" className="topbar__home" aria-current={home ? "page" : undefined}>
+      <Link to="/" className="topbar__home" aria-current={path === "/" ? "page" : undefined}>
         The Price Diaries
       </Link>
       <div className="topbar__actions">
+        <Link className="notes-link" to="/notes" aria-current={path === "/notes" ? "page" : undefined}>
+          Notes
+          {unread && (
+            <>
+              <span className="visually-hidden">,</span> <span className="notes-link__count">{unread}</span>
+            </>
+          )}
+        </Link>
         <Link className="paper-button paper-button--mustard" to="/add">
           Pin a new window
         </Link>

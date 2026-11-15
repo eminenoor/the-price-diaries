@@ -10,6 +10,7 @@ appears at least once, and the result is the same every run.
 
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -19,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from price_diaries.checker import update_group, update_size
-from price_diaries.db import Category, PricePoint, Product
+from price_diaries.db import Category, Notification, PricePoint, Product
 from price_diaries.fetcher import StoreBlockedError
 
 Ending = Literal["deal", "fake", "steady", "up", "blocked", "first", "two_days", "waiting"]
@@ -187,8 +188,9 @@ def seed_demo(session: Session, days: int = 90, seed: int = 7) -> int:
     today = datetime.now().replace(hour=9, minute=17, second=0, microsecond=0)
     days = max(days, _SCRIPTED_DAYS)
 
+    created: dict[str, Product] = {}
     for i, demo in enumerate(DEMO_PRODUCTS):
-        product = Product(
+        product = created[demo.name] = Product(
             url=f"https://demo.invalid/{demo.store}/{i}",
             name=demo.name,
             store=demo.store,
@@ -235,5 +237,57 @@ def seed_demo(session: Session, days: int = 90, seed: int = 7) -> int:
             )
     if session.scalar(select(Category).where(Category.name == EMPTY_FLOOR)) is None:
         session.add(Category(name=EMPTY_FLOOR, color=_FLOOR_COLOR))
+    session.flush()
+    _add_notes(session, created, today)
     session.commit()
     return len(DEMO_PRODUCTS)
+
+
+# Example notes, so the inbox isn't empty in screenshots: (product, kind, already read),
+# oldest first. They're written straight to the database; the demo never sends a desktop
+# notification.
+DEMO_NOTES: list[tuple[str, str, bool]] = [
+    ("Single-Origin Filter Coffee 500 g", "back_in_stock", True),
+    ("Magnesium Bisglycinate 120 caps", "target", True),
+    ("AHA BHA PHA 30 Days Miracle Toner 150 ml", "cheaper", False),
+    ("SPF 50+ Fluid Sunscreen 50 ml", "fake_sale", False),
+    ("Vitamin C 15% Serum 30 ml", "lowest", False),
+]
+
+
+def _add_notes(session: Session, products: dict[str, Product], today: datetime) -> None:
+    def prices(product: Product) -> list[PricePoint]:
+        return list(
+            session.scalars(
+                select(PricePoint)
+                .where(PricePoint.product_id == product.id)
+                .order_by(PricePoint.checked_at)
+            )
+        )
+
+    for minute, (name, kind, read) in enumerate(DEMO_NOTES):
+        product = products[name]
+        points = prices(product)
+        old, new = (p.effective_price(True) for p in points[-2:])
+        other_store = None
+        if kind == "cheaper":  # the same toner at Watsons, the same size
+            other = next(p for p in products.values() if p.store == "watsons" and p.gtin)
+            old, new, other_store = new, prices(other)[-1].price, other.store
+        elif kind == "target":  # an alert price the new price just reached
+            product.target_price = float(math.ceil(new / 10) * 10)
+        elif kind == "fake_sale":  # the raised price before the "discount"
+            old = next(p.price for p in reversed(points) if p.price != new)
+        elif kind == "back_in_stock":
+            points[-2].in_stock = False
+        created_at = today + timedelta(minutes=minute)
+        session.add(
+            Notification(
+                product_id=product.id,
+                kind=kind,
+                old_price=old,
+                new_price=new,
+                other_store=other_store,
+                created_at=created_at,
+                read_at=created_at + timedelta(hours=1) if read else None,
+            )
+        )

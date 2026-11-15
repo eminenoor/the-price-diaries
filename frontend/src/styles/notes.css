@@ -1,0 +1,207 @@
+/* ---------- Notes: the inbox ---------- */
+/* Night: paper notes taped to the door, tilted a little. Quiet: a plain list between rules.
+   Calm on purpose: no red badges, no movement. "new" and "read" are written in words. */
+
+/* The header link and its count. */
+.notes-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  min-height: 2.75rem;
+  color: var(--text);
+  font-weight: 700;
+  text-underline-offset: 0.25em;
+}
+
+.notes-link[aria-current="page"] {
+  text-decoration-thickness: 3px;
+}
+
+.notes-link__count {
+  padding: 0.05em 0.55em;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: var(--step--1);
+}
+
+.notes {
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+.notes__title {
+  margin: var(--space-3) 0 var(--space-4);
+  text-align: center;
+  font-size: var(--step-4);
+}
+
+.notes__summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-5);
+  font-weight: 700;
+}
+
+.notes__empty {
+  max-width: 36ch;
+  margin: 0 auto;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.notes__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Alternating left and right, so the door isn't one left-aligned column. */
+.inbox-note {
+  display: block;
+  width: min(100%, 34rem);
+  padding: var(--space-3) var(--space-4);
+  transform: rotate(var(--tilt, 0deg));
+}
+
+.inbox-note:nth-child(odd) {
+  align-self: flex-start;
+}
+
+.inbox-note:nth-child(even) {
+  align-self: flex-end;
+}
+
+.inbox-note--read {
+  background: var(--paper-faded);
+}
+
+.inbox-note__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.inbox-note__label {
+  padding: 0.1em 0.55em;
+  font-size: var(--step--1);
+  font-weight: 700;
+}
+
+.inbox-note__label--deal {
+  background: var(--mustard);
+  color: var(--ink);
+}
+
+.inbox-note__label--warning {
+  background: var(--rouge);
+  color: var(--on-rouge);
+}
+
+.inbox-note__label--plain {
+  border: 2px solid var(--ink);
+}
+
+.inbox-note__status {
+  font-size: var(--step--1);
+  font-weight: 700;
+}
+
+.inbox-note__text {
+  line-height: 1.5;
+}
+
+.inbox-note__text a {
+  color: inherit;
+  font-weight: 700;
+}
+
+.inbox-note__text .price {
+  font-size: 1.05em;
+}
+
+.inbox-note__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-2);
+  font-size: var(--step--1);
+}
+
+.inbox-note .text-button {
+  color: var(--ink);
+}
+
+/* The yellow focus ring is meant for the night sky; on paper, use ink. */
+.inbox-note a:focus-visible,
+.inbox-note .text-button:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .inbox-note {
+    padding: var(--space-3);
+  }
+}
+
+/* ---------- Quiet mode: a plain list between 2px rules ---------- */
+
+:root[data-mode="quiet"] .notes-link__count {
+  background: transparent;
+  color: var(--text);
+  border: 2px solid var(--rule);
+}
+
+:root[data-mode="quiet"] .notes__list {
+  gap: 0;
+  border-top: 2px solid var(--rule);
+}
+
+:root[data-mode="quiet"] .inbox-note {
+  width: 100%;
+  padding: var(--space-3) var(--space-2);
+  border-bottom: 2px solid var(--rule);
+}
+
+:root[data-mode="quiet"] .inbox-note:nth-child(even) {
+  text-align: right;
+}
+
+:root[data-mode="quiet"] .inbox-note:nth-child(even) .inbox-note__head,
+:root[data-mode="quiet"] .inbox-note:nth-child(even) .inbox-note__foot {
+  flex-direction: row-reverse;
+}
+
+:root[data-mode="quiet"] .inbox-note--read {
+  color: var(--text-dim);
+}
+
+:root[data-mode="quiet"] .inbox-note__label {
+  background: transparent;
+  color: inherit;
+  border: 2px solid currentColor;
+}
+
+:root[data-mode="quiet"] .inbox-note__label--warning {
+  color: var(--pencil);
+}
+
+:root[data-mode="quiet"] .inbox-note .text-button {
+  color: inherit;
+}
+
+:root[data-mode="quiet"] .inbox-note a:focus-visible,
+:root[data-mode="quiet"] .inbox-note .text-button:focus-visible {
+  outline-color: var(--focus);
+}

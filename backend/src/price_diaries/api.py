@@ -5,20 +5,19 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from price_diaries import migrate
 from price_diaries.analysis import (
-    Offer,
     cheaper_elsewhere,
     pick_display_name,
     price_anomalies,
@@ -28,8 +27,9 @@ from price_diaries.analysis import (
     unit_price,
 )
 from price_diaries.checker import check_all, check_product, update_size
-from price_diaries.db import Category, Database, Product
+from price_diaries.db import Category, Database, Notification, Product
 from price_diaries.fetcher import Fetcher
+from price_diaries.notifications import Notifier, make_notifier, notify_after_check
 from price_diaries.parsers import STORES, Size, parse_size, with_size
 from price_diaries.scheduler import build_scheduler
 from price_diaries.schemas import (
@@ -40,6 +40,8 @@ from price_diaries.schemas import (
     CheckResult,
     ElsewhereNote,
     LinkCreate,
+    NoteOut,
+    NotesOut,
     OfferOut,
     PricePointOut,
     ProductCreate,
@@ -62,9 +64,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     db = Database(settings.database_url)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         migrate.upgrade(settings.database_url)
-        scheduler = build_scheduler(db, settings) if settings.scheduler_enabled else None
+        scheduler = None
+        if settings.scheduler_enabled:
+            scheduler = build_scheduler(db, settings, app.state.notifier)
         if scheduler:
             scheduler.start()
         yield
@@ -74,6 +78,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="The Price Diaries", version="0.1.0", lifespan=lifespan)
     app.state.db = db
     app.state.settings = settings
+    # One notifier for the app's lifetime, so "not available" is logged only once.
+    app.state.notifier = make_notifier(settings)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -110,8 +116,13 @@ def get_app_settings(request: Request) -> Settings:
     return request.app.state.settings
 
 
+def get_notifier(request: Request) -> Notifier:
+    return request.app.state.notifier
+
+
 SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_app_settings)]
+NotifierDep = Annotated[Notifier, Depends(get_notifier)]
 
 
 def _get_product(session: Session, product_id: int) -> Product:
@@ -168,21 +179,6 @@ def _store_name(key: str) -> str:
     return _STORE_NAMES.get(key, key)
 
 
-def _offer(product: Product, use_member: bool) -> Offer | None:
-    """The latest price you'd pay at this store, or None before the first check."""
-    if not product.prices:
-        return None
-    latest = product.prices[-1]
-    return Offer(
-        product_id=product.id,
-        price=latest.effective_price(use_member),
-        checked_at=latest.checked_at,
-        in_stock=latest.in_stock,
-        size_amount=product.size_amount,
-        size_unit=product.size_unit,
-    )
-
-
 def _group(session: Session, product: Product) -> list[Product]:
     """The same product at other stores (not this one)."""
     if product.group_key is None:
@@ -204,10 +200,10 @@ def _unit_price_out(price: float, product: Product) -> UnitPriceOut | None:
 def _cheaper_elsewhere(
     product: Product, others: Sequence[Product], use_member: bool
 ) -> ElsewhereNote | None:
-    here = _offer(product, use_member)
+    here = product.offer(use_member)
     if here is None:
         return None
-    offers = [o for o in (_offer(p, use_member) for p in others) if o is not None]
+    offers = [o for o in (p.offer(use_member) for p in others) if o is not None]
     best = cheaper_elsewhere(here, offers, date.today())
     if best is None:
         return None
@@ -266,9 +262,9 @@ def _to_out(product: Product, use_member: bool, others: Sequence[Product] = ()) 
 
 def _elsewhere(product: Product, others: Sequence[Product], use_member: bool) -> list[OfferOut]:
     """The same product at other stores, cheapest first. Unchecked listings are left out."""
-    here = _offer(product, use_member)
+    here = product.offer(use_member)
     by_id = {p.id: p for p in others}
-    offers = [o for o in (_offer(p, use_member) for p in others) if o is not None]
+    offers = [o for o in (p.offer(use_member) for p in others) if o is not None]
     return [
         OfferOut(
             product_id=offer.product_id,
@@ -293,6 +289,29 @@ def _to_detail(session: Session, product: Product, use_member: bool) -> ProductD
         history=[PricePointOut.model_validate(p, from_attributes=True) for p in product.prices],
         anomalies=[AnomalyOut(**vars(a)) for a in price_anomalies(history)],
         elsewhere=_elsewhere(product, others, use_member),
+    )
+
+
+def _note_out(note: Notification, products: dict[int, Product]) -> NoteOut:
+    """A note, with the product's name as shown everywhere else (its group's name)."""
+    product = products[note.product_id]
+    others = (
+        [p for p in products.values() if p.group_key == product.group_key and p.id != product.id]
+        if product.group_key
+        else []
+    )
+    return NoteOut(
+        id=note.id,
+        kind=note.kind,  # type: ignore[arg-type]
+        product_id=product.id,
+        product_name=_display_name(product, others),
+        store=product.store,
+        store_name=_store_name(product.store),
+        old_price=note.old_price,
+        new_price=note.new_price,
+        other_store_name=_store_name(note.other_store) if note.other_store else None,
+        created_at=note.created_at,
+        read=note.read_at is not None,
     )
 
 
@@ -469,14 +488,56 @@ def _register_routes(app: FastAPI) -> None:
         session.commit()
 
     @app.post("/api/products/{product_id}/check")
-    async def check_one(product_id: int, session: SessionDep, settings: SettingsDep) -> CheckResult:
+    async def check_one(
+        product_id: int, session: SessionDep, settings: SettingsDep, notifier: NotifierDep
+    ) -> CheckResult:
         product = _get_product(session, product_id)
         async with Fetcher(0, 0, settings.request_timeout) as fetcher:
             outcome = await check_product(session, product, fetcher, settings.browser_fallback)
+        if outcome.ok:
+            await notify_after_check(session, [outcome.product_id], settings, notifier)
         return CheckResult(**vars(outcome))
 
     @app.post("/api/check")
-    async def check_everything(session: SessionDep, settings: SettingsDep) -> list[CheckResult]:
+    async def check_everything(
+        session: SessionDep, settings: SettingsDep, notifier: NotifierDep
+    ) -> list[CheckResult]:
         async with Fetcher(settings.min_delay, settings.max_delay, settings.request_timeout) as f:
             outcomes = await check_all(session, f, settings.browser_fallback)
+        checked = [o.product_id for o in outcomes if o.ok]
+        await notify_after_check(session, checked, settings, notifier)
         return [CheckResult(**vars(o)) for o in outcomes]
+
+    @app.get("/api/notifications")
+    def list_notes(session: SessionDep) -> NotesOut:
+        """The latest 100 notes, newest first, and how many are unread in all."""
+        notes = session.scalars(
+            select(Notification)
+            .order_by(Notification.created_at.desc(), Notification.id.desc())
+            .limit(100)
+        ).all()
+        unread = session.scalar(
+            select(func.count()).select_from(Notification).where(Notification.read_at.is_(None))
+        )
+        products = {p.id: p for p in session.scalars(select(Product)).all()}
+        return NotesOut(
+            unread=unread or 0,
+            notes=[_note_out(n, products) for n in notes],
+        )
+
+    @app.post("/api/notifications/{note_id}/read", status_code=status.HTTP_204_NO_CONTENT)
+    def read_note(note_id: int, session: SessionDep) -> None:
+        note = session.get(Notification, note_id)
+        if note is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Note not found.")
+        note.read_at = note.read_at or datetime.now()
+        session.commit()
+
+    @app.post("/api/notifications/read", status_code=status.HTTP_204_NO_CONTENT)
+    def read_all_notes(session: SessionDep) -> None:
+        session.execute(
+            update(Notification)
+            .where(Notification.read_at.is_(None))
+            .values(read_at=datetime.now())
+        )
+        session.commit()

@@ -137,6 +137,32 @@ export interface CheckResult {
   error: string | null;
 }
 
+export type NoteKind = "target" | "lowest" | "fake_sale" | "cheaper" | "back_in_stock";
+
+/** A note in the inbox, about one product. */
+export interface Note {
+  id: number;
+  kind: NoteKind;
+  product_id: number;
+  product_name: string;
+  store: string;
+  store_name: string;
+  /** The price at the check before; for "cheaper", the price here. */
+  old_price: number | null;
+  /** The new price; for "cheaper", the other store's price for this size. */
+  new_price: number | null;
+  /** For "cheaper": the store that sells it. */
+  other_store_name: string | null;
+  created_at: string;
+  read: boolean;
+}
+
+export interface Notes {
+  unread: number;
+  /** The latest notes, newest first. */
+  notes: Note[];
+}
+
 export interface NewProduct {
   url: string;
   name: string;
@@ -198,4 +224,7 @@ export const api = {
   unlink: (id: number) => request<void>(`/products/${id}/link`, { method: "DELETE" }),
   check: (id: number) => request<CheckResult>(`/products/${id}/check`, { method: "POST" }),
   checkAll: () => request<CheckResult[]>("/check", { method: "POST" }),
+  notes: () => request<Notes>("/notifications"),
+  readNote: (id: number) => request<void>(`/notifications/${id}/read`, { method: "POST" }),
+  readAllNotes: () => request<void>("/notifications/read", { method: "POST" }),
 };
