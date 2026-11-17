@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -183,18 +183,18 @@ class LinkCreate(BaseModel):
     other_id: int = Field(description="A product to group this one with.")
 
 
-NoteKind = Literal["target", "lowest", "fake_sale", "cheaper", "back_in_stock"]
+NoteKind = Literal["target", "lowest", "fake_sale", "cheaper", "back_in_stock", "sunday_paper"]
 
 
 class NoteOut(BaseModel):
-    """A note in the inbox, about one product."""
+    """A note in the inbox: about one product, or the Sunday paper (no product)."""
 
     id: int
     kind: NoteKind
-    product_id: int
-    product_name: str
-    store: str
-    store_name: str
+    product_id: int | None
+    product_name: str | None
+    store: str | None
+    store_name: str | None
     old_price: float | None = Field(
         description="The price at the check before; for cheaper, the price here."
     )
@@ -202,6 +202,9 @@ class NoteOut(BaseModel):
         description="The new price; for cheaper, the other store's price for this size."
     )
     other_store_name: str | None = Field(description="For cheaper: the store that sells it.")
+    week: date | None = Field(
+        default=None, description="For sunday_paper: the Monday of the week it's about."
+    )
     created_at: datetime
     read: bool
 
@@ -209,6 +212,63 @@ class NoteOut(BaseModel):
 class NotesOut(BaseModel):
     unread: int
     notes: list[NoteOut] = Field(description="The latest notes, newest first.")
+
+
+class PaperItem(BaseModel):
+    """One product in the Sunday paper."""
+
+    product_id: int
+    name: str
+    store_name: str
+
+
+class PaperMove(PaperItem):
+    """The price before the week against the last price in it."""
+
+    old_price: float
+    new_price: float
+    change_pct: float
+
+
+class PaperLow(PaperItem):
+    price: float = Field(description="The week's lowest price.")
+    at: datetime
+    previous_low: float = Field(description="The lowest price before the week.")
+
+
+class PaperFakeSale(PaperItem):
+    price: float = Field(description="The 'sale' price.")
+    peak: float = Field(description="The raised price before it.")
+    at: datetime
+
+
+class PaperCheaper(PaperItem):
+    other_store_name: str
+    price_here: float
+    price_there: float = Field(description="The other store's price for this product's size.")
+    at: datetime
+
+
+class PaperTrouble(PaperItem):
+    failed_checks: int = Field(description="Checks that couldn't get a price this week.")
+    last_error: str | None
+    out_of_stock_at: datetime | None = Field(description="When it went out of stock this week.")
+
+
+class PaperOut(BaseModel):
+    """One week, Monday to Sunday. Every list may be empty."""
+
+    week_start: date
+    week_end: date
+    previous_week: date | None = Field(description="None before the first check.")
+    next_week: date | None = Field(description="None when the next paper isn't out yet.")
+    products_checked: int = Field(description="Products checked at least once this week.")
+    drops: list[PaperMove] = Field(description="Biggest drop first.")
+    new_lows: list[PaperLow]
+    fake_sales: list[PaperFakeSale]
+    cheaper: list[PaperCheaper] = Field(description="Biggest saving first.")
+    rises: list[PaperMove] = Field(description="Biggest rise first.")
+    trouble: list[PaperTrouble] = Field(description="Failed checks or out of stock.")
 
 
 class CheckResult(BaseModel):

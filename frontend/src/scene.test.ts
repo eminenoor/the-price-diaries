@@ -3,8 +3,14 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import type { Category, Product, Summary } from "./api";
+import type { Category, Paper, PaperMove, Product, Summary } from "./api";
 import {
+  checkedLine,
+  moveWords,
+  paperLead,
+  paperSections,
+  PRINT_LIMIT,
+  quietWeekLine,
   contrast,
   floorsOf,
   inkOn,
@@ -465,6 +471,20 @@ describe("tokens meet WCAG AA", () => {
     expect(contrast(night.pencil, night.paper)).toBeGreaterThanOrEqual(3);
   });
 
+  // The Sunday paper printed: ink on white, with the deal and warning strips kept.
+  const print = { ...quiet, ...block("@media print") };
+  it.each([
+    ["text", "bg"],
+    ["text-dim", "bg"],
+    ["ink", "paper"],
+    ["ink", "mustard"],
+    ["on-rouge", "rouge"],
+    ["pencil", "bg"],
+  ] as const)("print: %s on %s", (fg, bg) => {
+    expect(print.bg).toBe("#ffffff");
+    expect(contrast(print[fg], print[bg])).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("focus ring stands out (3:1) in both modes", () => {
     expect(contrast(night.focus, night.bg)).toBeGreaterThanOrEqual(3);
     expect(contrast(quiet.focus, quiet.bg)).toBeGreaterThanOrEqual(3);
@@ -479,6 +499,7 @@ describe("notes", () => {
       fake_sale: "fake sale",
       cheaper: "cheaper elsewhere",
       back_in_stock: "back in stock",
+      sunday_paper: "sunday paper",
     });
   });
 
@@ -488,11 +509,94 @@ describe("notes", () => {
     expect(noteTone("cheaper")).toBe("deal");
     expect(noteTone("fake_sale")).toBe("warning");
     expect(noteTone("back_in_stock")).toBe("plain");
+    expect(noteTone("sunday_paper")).toBe("plain");
   });
 
   it("counts unread notes quietly, and says nothing when all are read", () => {
     expect(unreadLabel(0)).toBe("");
     expect(unreadLabel(1)).toBe("1 new");
     expect(unreadLabel(12)).toBe("12 new");
+  });
+});
+
+/** A paper for the week of 9 to 15 November 2026, with nothing in it. */
+const emptyPaper =(overrides: Partial<Paper> = {}): Paper => ({
+  week_start: "2026-11-09",
+  week_end: "2026-11-15",
+  previous_week: "2026-11-02",
+  next_week: null,
+  products_checked: 16,
+  drops: [],
+  new_lows: [],
+  fake_sales: [],
+  cheaper: [],
+  rises: [],
+  trouble: [],
+  ...overrides,
+});
+
+const move = (id: number, pct: number): PaperMove => ({
+  product_id: id,
+  name: `Product ${id}`,
+  store_name: "Gratis",
+  old_price: 100,
+  new_price: 100 + pct,
+  change_pct: pct,
+});
+
+describe("the Sunday paper", () => {
+  it("leads with the biggest drop, and lists the others as more drops", () => {
+    const paper = emptyPaper({ drops: [move(1, -20), move(2, -5)] });
+    expect(paperLead(paper)?.product_id).toBe(1);
+    expect(paperSections(paper).map((s) => [s.key, s.title, s.count])).toEqual([["drops", "more drops", 1]]);
+  });
+
+  it("leaves out empty sections, and keeps the reading order", () => {
+    const paper = emptyPaper({
+      drops: [move(1, -20)],
+      rises: [move(2, 6)],
+      fake_sales: [{ product_id: 3, name: "Sunscreen", store_name: "Watsons", price: 349, peak: 436, at: "2026-11-12T09:17:00" }],
+    });
+    expect(paperSections(paper).map((s) => s.key)).toEqual(["fake_sales", "rises"]);
+  });
+
+  it("uses mustard for good news and rouge only for fake sales", () => {
+    const all = emptyPaper({
+      drops: [move(1, -20), move(2, -10)],
+      new_lows: [{ product_id: 1, name: "a", store_name: "b", price: 80, at: "2026-11-10T09:17:00", previous_low: 90 }],
+      fake_sales: [{ product_id: 3, name: "a", store_name: "b", price: 1, peak: 2, at: "2026-11-10T09:17:00" }],
+      cheaper: [{ product_id: 4, name: "a", store_name: "b", other_store_name: "c", price_here: 2, price_there: 1, at: "2026-11-10T09:17:00" }],
+      rises: [move(5, 6)],
+      trouble: [{ product_id: 6, name: "a", store_name: "b", failed_checks: 1, last_error: "x", out_of_stock_at: null }],
+    });
+    expect(Object.fromEntries(paperSections(all).map((s) => [s.key, s.tone]))).toEqual({
+      drops: "deal",
+      new_lows: "deal",
+      fake_sales: "warning",
+      cheaper: "deal",
+      rises: "plain",
+      trouble: "plain",
+    });
+  });
+
+  it("prints at most five items a section, so the page fits on one A4 sheet", () => {
+    const drops = Array.from({ length: 9 }, (_, i) => move(i + 1, -(20 - i)));
+    const [section] = paperSections(emptyPaper({ drops }));
+    expect([section.count, section.printed]).toEqual([8, PRINT_LIMIT]);
+  });
+
+  it("says a quiet week in one calm line", () => {
+    expect(quietWeekLine(emptyPaper())).toBe("A quiet week. No price moved, and every check went through.");
+    expect(quietWeekLine(emptyPaper({ products_checked: 0 }))).toBe(
+      "No prices were checked this week, so there's no news.",
+    );
+    expect(quietWeekLine(emptyPaper({ drops: [move(1, -20)] }))).toBeNull();
+  });
+
+  it("writes moves and counts in words", () => {
+    expect(moveWords(-12)).toBe("down 12.0%");
+    expect(moveWords(3)).toBe("up 3.0%");
+    expect(checkedLine(1)).toBe("1 product checked");
+    expect(checkedLine(16)).toBe("16 products checked");
   });
 });

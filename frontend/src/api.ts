@@ -137,22 +137,24 @@ export interface CheckResult {
   error: string | null;
 }
 
-export type NoteKind = "target" | "lowest" | "fake_sale" | "cheaper" | "back_in_stock";
+export type NoteKind = "target" | "lowest" | "fake_sale" | "cheaper" | "back_in_stock" | "sunday_paper";
 
-/** A note in the inbox, about one product. */
+/** A note in the inbox: about one product, or the Sunday paper (no product). */
 export interface Note {
   id: number;
   kind: NoteKind;
-  product_id: number;
-  product_name: string;
-  store: string;
-  store_name: string;
+  product_id: number | null;
+  product_name: string | null;
+  store: string | null;
+  store_name: string | null;
   /** The price at the check before; for "cheaper", the price here. */
   old_price: number | null;
   /** The new price; for "cheaper", the other store's price for this size. */
   new_price: number | null;
   /** For "cheaper": the store that sells it. */
   other_store_name: string | null;
+  /** For "sunday_paper": the Monday of the week it's about, "2026-11-09". */
+  week: string | null;
   created_at: string;
   read: boolean;
 }
@@ -161,6 +163,74 @@ export interface Notes {
   unread: number;
   /** The latest notes, newest first. */
   notes: Note[];
+}
+
+/** One product in the Sunday paper. */
+export interface PaperItem {
+  product_id: number;
+  name: string;
+  store_name: string;
+}
+
+/** The price before the week against the last price in it. */
+export interface PaperMove extends PaperItem {
+  old_price: number;
+  new_price: number;
+  change_pct: number;
+}
+
+export interface PaperLow extends PaperItem {
+  /** The week's lowest price. */
+  price: number;
+  at: string;
+  /** The lowest price before the week. */
+  previous_low: number;
+}
+
+export interface PaperFakeSale extends PaperItem {
+  /** The "sale" price. */
+  price: number;
+  /** The raised price before it. */
+  peak: number;
+  at: string;
+}
+
+export interface PaperCheaper extends PaperItem {
+  other_store_name: string;
+  price_here: number;
+  /** The other store's price for this product's size. */
+  price_there: number;
+  at: string;
+}
+
+export interface PaperTrouble extends PaperItem {
+  /** Checks that couldn't get a price this week. */
+  failed_checks: number;
+  last_error: string | null;
+  /** When it went out of stock this week. */
+  out_of_stock_at: string | null;
+}
+
+/** One week, Monday to Sunday. Every list may be empty. */
+export interface Paper {
+  week_start: string;
+  week_end: string;
+  /** null before the first check. */
+  previous_week: string | null;
+  /** null when the next paper isn't out yet. */
+  next_week: string | null;
+  /** Products checked at least once this week. */
+  products_checked: number;
+  /** Biggest drop first. */
+  drops: PaperMove[];
+  new_lows: PaperLow[];
+  fake_sales: PaperFakeSale[];
+  /** Biggest saving first. */
+  cheaper: PaperCheaper[];
+  /** Biggest rise first. */
+  rises: PaperMove[];
+  /** Failed checks or out of stock. */
+  trouble: PaperTrouble[];
 }
 
 export interface NewProduct {
@@ -227,4 +297,7 @@ export const api = {
   notes: () => request<Notes>("/notifications"),
   readNote: (id: number) => request<void>(`/notifications/${id}/read`, { method: "POST" }),
   readAllNotes: () => request<void>("/notifications/read", { method: "POST" }),
+  /** The paper for the week a date falls in; without one, the latest paper. */
+  paper: (week: string | null) =>
+    request<Paper>(week ? `/paper?week=${encodeURIComponent(week)}` : "/paper"),
 };

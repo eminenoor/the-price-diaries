@@ -12,15 +12,16 @@ from __future__ import annotations
 
 import math
 import random
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
 from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from price_diaries.analysis import paper_week
 from price_diaries.checker import update_group, update_size
-from price_diaries.db import Category, Notification, PricePoint, Product
+from price_diaries.db import Category, CheckFailure, Notification, PricePoint, Product
 from price_diaries.fetcher import StoreBlockedError
 
 Ending = Literal["deal", "fake", "steady", "up", "blocked", "first", "two_days", "waiting"]
@@ -183,9 +184,55 @@ def _ending(ending: Ending, base: float, history: list[float]) -> list[float]:
     return [*flat, base]  # steady, blocked
 
 
-def seed_demo(session: Session, days: int = 90, seed: int = 7) -> int:
+# The latest Sunday paper's week has news in every section, so the paper isn't empty in
+# screenshots. Changes there stop the day before today, so every product's state today
+# (and the home page) stays as scripted above.
+PAPER_RISE = "Gentle Foaming Cleanser 150 ml"
+PAPER_FAKE = "Laundry Liquid 2.5 l"
+PAPER_SOLD_OUT = "Vitamin D3 1000 IU, 90 tablets"
+PAPER_SLOWED = "Vitamin C 15% Serum 30 ml"  # one check stopped by a "too many requests"
+
+
+@dataclass
+class PaperWeekScript:
+    prices: dict[date, float] = field(default_factory=dict)
+    sold_out: set[date] = field(default_factory=set)
+    failed: dict[date, str] = field(default_factory=dict)  # no price that day, this error
+
+
+def paper_week_script(demo: DemoProduct, low: float, today: date) -> PaperWeekScript:
+    """One product's part in the paper week. ``low`` is its lowest price before the
+    scripted days, which a deal's new low has to beat."""
+    monday = paper_week(today)
+    yesterday = today - timedelta(days=1)
+
+    def day(k: int) -> date:
+        return monday + timedelta(days=k)
+
+    def until_yesterday(k: int) -> list[date]:
+        return [day(k) + timedelta(days=i) for i in range((yesterday - day(k)).days + 1)]
+
+    script = PaperWeekScript()
+    if demo.ending == "deal":  # a drop to a new low on Wednesday; today's is lower still
+        script.prices = {d: round(low * 0.965, 2) for d in until_yesterday(2)}
+    elif demo.name == PAPER_RISE:  # up 3% on Thursday; today's 6% comes on top
+        script.prices = {d: round(demo.base * 1.03, 2) for d in until_yesterday(3)}
+    elif demo.name == PAPER_FAKE:  # raised Monday to Wednesday, "discounted" on Thursday
+        script.prices = {day(k): round(demo.base * 1.25, 2) for k in range(3)}
+    elif demo.name == PAPER_SOLD_OUT:
+        script.sold_out = {day(4)}
+    if demo.ending == "blocked":  # blocked since Friday
+        host = f"www.{demo.store}.com.tr"
+        script.failed = {d: str(StoreBlockedError(host, 403)) for d in until_yesterday(4)}
+        script.failed[today] = str(StoreBlockedError(host, 403))
+    if demo.name == PAPER_SLOWED:
+        script.failed = {day(1): str(StoreBlockedError(f"www.{demo.store}.com.tr", 429))}
+    return script
+
+
+def seed_demo(session: Session, days: int = 90, seed: int = 7, now: datetime | None = None) -> int:
     rng = random.Random(seed)
-    today = datetime.now().replace(hour=9, minute=17, second=0, microsecond=0)
+    today = (now or datetime.now()).replace(hour=9, minute=17, second=0, microsecond=0)
     days = max(days, _SCRIPTED_DAYS)
 
     created: dict[str, Product] = {}
@@ -221,9 +268,22 @@ def seed_demo(session: Session, days: int = 90, seed: int = 7) -> int:
             continue
 
         history = _random_walk(rng, demo.base, days + 1 - _SCRIPTED_DAYS)
-        prices = history + _ending(demo.ending, demo.base, history)
+        ending = _ending(demo.ending, demo.base, history)
+        if demo.name == PAPER_FAKE:  # its raise moves into the paper week
+            ending = [demo.base] * _SCRIPTED_DAYS
+        prices = history + ending
+        script = paper_week_script(demo, min([*history, demo.base]), today.date())
         start = today - timedelta(days=len(prices) - 1)
         for day, price in enumerate(prices):
+            checked_at = start + timedelta(days=day)
+            # Draw from the random stream for every day, scripted or not, so the products
+            # after this one keep their history.
+            in_stock = day == len(prices) - 1 or rng.random() > 0.02
+            if checked_at.date() in script.failed:
+                error = script.failed[checked_at.date()]
+                session.add(CheckFailure(product_id=product.id, error=error, checked_at=checked_at))
+                continue
+            price = script.prices.get(checked_at.date(), price)
             member = round(price * demo.member_share, 2) if demo.member_share else None
             session.add(
                 PricePoint(
@@ -231,8 +291,8 @@ def seed_demo(session: Session, days: int = 90, seed: int = 7) -> int:
                     price=price,
                     member_price=member,
                     currency="TRY",
-                    in_stock=day == len(prices) - 1 or rng.random() > 0.02,
-                    checked_at=start + timedelta(days=day),
+                    in_stock=in_stock and checked_at.date() not in script.sold_out,
+                    checked_at=checked_at,
                 )
             )
     if session.scalar(select(Category).where(Category.name == EMPTY_FLOOR)) is None:
@@ -291,3 +351,26 @@ def _add_notes(session: Session, products: dict[str, Product], today: datetime) 
                 read_at=created_at + timedelta(hours=1) if read else None,
             )
         )
+
+    # In the paper week: the big laundry bottle was cheaper per litre at Trendyol on Friday.
+    monday = paper_week(today.date())
+    friday = datetime.combine(monday + timedelta(days=4), today.time()) + timedelta(minutes=3)
+    laundry, smaller = products[PAPER_FAKE], products["Laundry Liquid 1.5 l"]
+    per_ml = prices(smaller)[-1].price / (smaller.size_amount or 1)
+    session.add(
+        Notification(
+            product_id=laundry.id,
+            kind="cheaper",
+            old_price=next(
+                p.price for p in prices(laundry) if p.checked_at.date() == friday.date()
+            ),
+            new_price=round(per_ml * (laundry.size_amount or 1), 2),
+            other_store=smaller.store,
+            created_at=friday,
+            read_at=friday + timedelta(hours=2),
+        )
+    )
+    # And the paper itself, out on that week's Sunday morning.
+    if session.scalar(select(Notification).where(Notification.week == monday)) is None:
+        sunday = datetime.combine(monday + timedelta(days=6), today.time()) + timedelta(minutes=5)
+        session.add(Notification(kind="sunday_paper", week=monday, created_at=sunday))

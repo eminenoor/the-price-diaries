@@ -69,6 +69,10 @@ function useNotesChange<TArgs>(fn: (args: TArgs) => Promise<void>) {
   });
 }
 
+/** The Sunday paper for the week a date falls in (null: the latest). */
+export const usePaper = (week: string | null) =>
+  useQuery({ queryKey: ["paper", week ?? "latest"], queryFn: () => api.paper(week) });
+
 export const useReadNote = () => useNotesChange((id: number) => api.readNote(id));
 export const useReadAllNotes = () => useNotesChange(() => api.readAllNotes());
 

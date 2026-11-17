@@ -3,10 +3,20 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
-from sqlalchemy import Float, ForeignKey, Index, String, create_engine, event, false, func
+from sqlalchemy import (
+    Date,
+    Float,
+    ForeignKey,
+    Index,
+    String,
+    create_engine,
+    event,
+    false,
+    func,
+)
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -122,22 +132,40 @@ class PricePoint(Base):
 
 
 class Notification(Base):
-    """A note in the inbox: something worth knowing about a product after a check."""
+    """A note in the inbox: something worth knowing about a product after a check, or
+    that the Sunday paper is ready."""
 
     __tablename__ = "notifications"
+    # One Sunday paper note per week. Product notes have no week, and NULLs never clash.
+    __table_args__ = (Index("ux_notifications_kind_week", "kind", "week", unique=True),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    product_id: Mapped[int] = mapped_column(
+    # None for the Sunday paper note.
+    product_id: Mapped[int | None] = mapped_column(
         ForeignKey("products.id", ondelete="CASCADE"), index=True
     )
-    # "target", "lowest", "fake_sale", "cheaper" or "back_in_stock"
+    # "target", "lowest", "fake_sale", "cheaper", "back_in_stock" or "sunday_paper"
     kind: Mapped[str] = mapped_column(String(16))
     old_price: Mapped[float | None] = mapped_column(Float)
     new_price: Mapped[float | None] = mapped_column(Float)
     # For "cheaper": the store that sells it for less (new_price is its price for this size).
     other_store: Mapped[str | None] = mapped_column(String(32))
+    # For "sunday_paper": the Monday of the week the paper is about.
+    week: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(default=datetime.now)
     read_at: Mapped[datetime | None] = mapped_column()
+
+
+class CheckFailure(Base):
+    """A check that couldn't get a price, kept so the Sunday paper can report it."""
+
+    __tablename__ = "check_failures"
+    __table_args__ = (Index("ix_check_failures_product_time", "product_id", "checked_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
+    error: Mapped[str] = mapped_column(String(500))
+    checked_at: Mapped[datetime] = mapped_column(default=datetime.now)
 
 
 class AlertState(Base):

@@ -18,9 +18,22 @@ const note = (overrides: Partial<Note> = {}): Note => ({
   old_price: 300,
   new_price: 268.22,
   other_store_name: null,
+  week: null,
   created_at: "2026-11-15T09:17:00",
   read: false,
   ...overrides,
+});
+
+const PAPER_NOTE = note({
+  id: 6,
+  kind: "sunday_paper",
+  product_id: null,
+  product_name: null,
+  store: null,
+  store_name: null,
+  old_price: null,
+  new_price: null,
+  week: "2026-11-09",
 });
 
 const NOTES: Note[] = [
@@ -120,6 +133,19 @@ describe("notes", () => {
       "Miracle Toner at Gratis is now 249,90 lira (was 300,00 lira), at or under your alert price.",
     );
     expect(within(lowest).getByText("15 Nov, 09:17")).toHaveAttribute("datetime", "2026-11-15T09:17:00");
+  });
+
+  it("says the Sunday paper is ready, linked to that week's paper", async () => {
+    renderNotes([PAPER_NOTE]);
+    const [item] = await screen.findAllByRole("listitem");
+    expect(heard(item.querySelector(".inbox-note__head")!)).toBe("sunday paper new");
+    expect(heard(item.querySelector(".inbox-note__text")!)).toBe(
+      "Your Sunday paper is ready: the week of 9 to 15 Nov, on one page.",
+    );
+    expect(within(item).getByRole("link", { name: "Your Sunday paper is ready" })).toHaveAttribute(
+      "href",
+      "/paper?week=2026-11-09",
+    );
   });
 
   it("renders every price with the Price component", async () => {

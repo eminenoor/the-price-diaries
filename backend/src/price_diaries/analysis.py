@@ -340,6 +340,120 @@ def fresh_alerts(
     ]
 
 
+# --- the Sunday paper --------------------------------------------------------------------
+
+
+def week_start(day: date) -> date:
+    """The Monday of ``day``'s week."""
+    return day - timedelta(days=day.weekday())
+
+
+def paper_week(today: date) -> date:
+    """The Monday of the latest week whose Sunday has come: this week on a Sunday (the
+    paper comes out that morning), last week on any other day."""
+    this_week = week_start(today)
+    return this_week if today.weekday() == 6 else this_week - timedelta(days=7)
+
+
+def noticeable(old: float, new: float) -> bool:
+    """A change of at least ₺1 and at least 1% (in exact kuruş), the same bar as a new low."""
+    if old <= 0:
+        return False
+    change = abs(Decimal(str(new)) - Decimal(str(old)))
+    return change >= MIN_LOW_DROP and change >= Decimal(str(old)) * MIN_LOW_DROP_SHARE
+
+
+@dataclass(frozen=True)
+class WeekMove:
+    """The price before the week against the price at its last check."""
+
+    old_price: float
+    new_price: float
+    change_pct: float
+
+
+@dataclass(frozen=True)
+class WeekLow:
+    price: float
+    at: datetime
+    previous_low: float
+
+
+@dataclass(frozen=True)
+class WeekFakeSale:
+    """The check that first showed a fake sale, and the raised price before it."""
+
+    price: float
+    peak: float
+    at: datetime
+
+
+@dataclass(frozen=True)
+class WeekStory:
+    """What happened to one product in one week, from its checks."""
+
+    move: WeekMove | None = None
+    new_low: WeekLow | None = None
+    fake_sale: WeekFakeSale | None = None
+    out_of_stock_at: datetime | None = None
+    checked: bool = False  # it was checked at least once that week
+
+
+def week_story(readings: list[Reading], monday: date, fake_window_days: int = 14) -> WeekStory:
+    """One product's week (``monday`` to Sunday), from all its readings, oldest first.
+
+    - move: the price before the week against the last price in it, when the change is
+      noticeable. A product first checked this week has nothing to compare with, and a
+      drop that's a fake sale isn't a move.
+    - new_low: the week's lowest price beats every price before the week by ₺1 and 1%.
+    - fake_sale: a check this week turned the fake-sale rule on (it was off at the check
+      before), so a fake sale that spans two weeks is only news in the first.
+    - out_of_stock_at: the first check this week that was out of stock after one that wasn't.
+    """
+    end = monday + timedelta(days=7)
+    before = [r for r in readings if r.checked_at.date() < monday]
+    week = [i for i, r in enumerate(readings) if monday <= r.checked_at.date() < end]
+    if not week:
+        return WeekStory()
+    in_week = [readings[i] for i in week]
+
+    move = None
+    if before:
+        old, new = before[-1].price, in_week[-1].price
+        if noticeable(old, new):
+            move = WeekMove(old, new, round((new - old) / old * 100, 2))
+
+    new_low = None
+    if before:
+        lowest = min(in_week, key=lambda r: (r.price, r.checked_at))
+        previous_low = min(r.price for r in before)
+        if is_new_low(lowest.price, previous_low):
+            new_low = WeekLow(lowest.price, lowest.checked_at, previous_low)
+
+    fake_sale = None
+    history = [(r.checked_at, r.price) for r in readings]
+    for i in week:
+        if is_fake_sale(history[: i + 1]) and not (i > 0 and is_fake_sale(history[:i])):
+            since = readings[i].checked_at - timedelta(days=fake_window_days)
+            peak = max(r.price for r in readings[:i] if r.checked_at >= since)
+            fake_sale = WeekFakeSale(readings[i].price, peak, readings[i].checked_at)
+            break
+
+    # A "drop" back from a raised price isn't one: it goes under fake sales only.
+    if move and move.change_pct < 0 and (fake_sale or is_fake_sale(history[: week[-1] + 1])):
+        move = None
+
+    out_of_stock_at = next(
+        (
+            readings[i].checked_at
+            for i in week
+            if not readings[i].in_stock and i > 0 and readings[i - 1].in_stock
+        ),
+        None,
+    )
+    return WeekStory(move, new_low, fake_sale, out_of_stock_at, checked=True)
+
+
 def pick_display_name(names: list[str]) -> str:
     """The most complete of several stores' names for one product.
 

@@ -3,7 +3,7 @@
  * where it hangs, which floor it belongs to and what the subtitle says.
  * No React here, so all of it is unit-tested in scene.test.ts.
  */
-import type { Category, NoteKind, Product, Summary } from "./api";
+import type { Category, NoteKind, Paper, PaperMove, Product, Summary } from "./api";
 import { formatChange, formatDate, formatPrice, pickFeature } from "./format";
 
 // --- window state -------------------------------------------------------------
@@ -621,12 +621,77 @@ export const NOTE_LABELS: Record<NoteKind, string> = {
   fake_sale: "fake sale",
   cheaper: "cheaper elsewhere",
   back_in_stock: "back in stock",
+  sunday_paper: "sunday paper",
 };
 
+export type Tone = "deal" | "warning" | "plain";
+
 /** Mustard for good deals, rouge for warnings, plain paper for the rest. */
-export function noteTone(kind: NoteKind): "deal" | "warning" | "plain" {
+export function noteTone(kind: NoteKind): Tone {
   if (kind === "fake_sale") return "warning";
-  return kind === "back_in_stock" ? "plain" : "deal";
+  return kind === "back_in_stock" || kind === "sunday_paper" ? "plain" : "deal";
+}
+
+// --- the Sunday paper -------------------------------------------------------------------
+
+export type PaperSectionKey = "drops" | "new_lows" | "fake_sales" | "cheaper" | "rises" | "trouble";
+
+export interface PaperSection {
+  key: PaperSectionKey;
+  /** Lowercase, like a poster headline: "new lows". */
+  title: string;
+  tone: Tone;
+  /** A short handwritten margin note, or null. */
+  hand: string | null;
+  /** How many items the section has (the lead story isn't one of the drops here). */
+  count: number;
+  /** How many of them fit when printed; "and 2 more" covers the rest. */
+  printed: number;
+}
+
+/** On one printed A4 page, each section shows at most this many items. */
+export const PRINT_LIMIT = 5;
+
+const SECTIONS: { key: PaperSectionKey; title: string; tone: Tone; hand: string | null }[] = [
+  { key: "drops", title: "more drops", tone: "deal", hand: null },
+  { key: "new_lows", title: "new lows", tone: "deal", hand: "lowest ever!" },
+  { key: "fake_sales", title: "fake sales caught", tone: "warning", hand: "not really cheaper" },
+  { key: "cheaper", title: "cheaper elsewhere", tone: "deal", hand: null },
+  { key: "rises", title: "price rises", tone: "plain", hand: null },
+  { key: "trouble", title: "failed checks and sold out", tone: "plain", hand: null },
+];
+
+/**
+ * The paper's sections in reading order, leaving out the empty ones. The biggest drop is
+ * the lead story at the top, so "more drops" holds the others.
+ */
+export function paperSections(paper: Paper): PaperSection[] {
+  return SECTIONS.map((s) => {
+    const count = s.key === "drops" ? Math.max(paper.drops.length - 1, 0) : paper[s.key].length;
+    return { ...s, count, printed: Math.min(count, PRINT_LIMIT) };
+  }).filter((s) => s.count > 0);
+}
+
+/** The lead story: the biggest drop of the week, if anything got cheaper. */
+export function paperLead(paper: Paper): PaperMove | null {
+  return paper.drops[0] ?? null;
+}
+
+/** One calm line when nothing happened; null when there's news. */
+export function quietWeekLine(paper: Paper): string | null {
+  if (paperLead(paper) || paperSections(paper).length > 0) return null;
+  if (paper.products_checked === 0) return "No prices were checked this week, so there's no news.";
+  return "A quiet week. No price moved, and every check went through.";
+}
+
+/** "16 products checked" under the dateline. */
+export function checkedLine(count: number): string {
+  return count === 1 ? "1 product checked" : `${count} products checked`;
+}
+
+/** "down 12.0%" or "up 3.0%", in words. */
+export function moveWords(pct: number): string {
+  return `${pct < 0 ? "down" : "up"} ${formatChange(pct).slice(1)}`;
 }
 
 /** The header's count: "2 new", or nothing when every note is read. */

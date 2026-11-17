@@ -235,6 +235,8 @@ async def send_desktop(session: Session, notes: Sequence[Notification], notifier
     """One desktop notification per note. A failure is logged and never stops the rest."""
     for note in notes:
         try:
+            if note.product_id is None:
+                continue
             product = session.get(Product, note.product_id)
             if product is None:
                 continue

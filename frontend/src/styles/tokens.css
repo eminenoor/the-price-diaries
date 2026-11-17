@@ -3,7 +3,7 @@
 
   Night view (default): a building at night, each product a lit or dark
   window. Quiet mode (data-mode="quiet"): a daylight poster with grease
-  pencil marks. See docs/design.md.
+  pencil marks. Print: plain ink on white, whatever the mode.
 
   Every text/background pair below is checked for WCAG AA contrast by
   src/scene.test.ts, so keep text colours as plain #RRGGBB values.
@@ -95,4 +95,17 @@
   --pencil: #c23b22; /* red grease pencil */
   --focus: #141414;
   --rule: #141414;
+}
+
+/* Printed (the Sunday paper): ink on white in both modes. */
+@media print {
+  :root,
+  :root[data-mode="quiet"] {
+    --bg: #ffffff;
+    --text: #141414;
+    --text-dim: #5e5e58;
+    --paper: #ffffff;
+    --ink: #141414;
+    --rule: #141414;
+  }
 }

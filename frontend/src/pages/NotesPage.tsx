@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import type { Note } from "../api";
 import { Price } from "../components/Price";
-import { formatDate, formatTime } from "../format";
+import { formatDate, formatTime, formatWeek } from "../format";
 import { useNotes, useReadAllNotes, useReadNote } from "../hooks";
 import { useMode } from "../mode";
 import { NOTE_LABELS, noteTone, placement } from "../scene";
@@ -93,6 +93,15 @@ function NoteItem({ note }: { note: Note }) {
 
 /** The note in one plain sentence, the same one the desktop notification shows. */
 export function NoteSentence({ note }: { note: Note }) {
+  if (note.kind === "sunday_paper") {
+    const week = note.week ?? "";
+    return (
+      <>
+        <Link to={`/paper?week=${week}`}>Your Sunday paper is ready</Link>: the week of {formatWeek(week)}, on one
+        page.
+      </>
+    );
+  }
   const name = <Link to={`/products/${note.product_id}`}>{note.product_name}</Link>;
   const now = note.new_price !== null ? <Price value={note.new_price} /> : null;
   // "(was ₺420,00)" next to "now ₺420,00" says nothing, so leave it out.

@@ -7,9 +7,26 @@ import {
   formatCheck,
   formatPrice,
   formatSize,
+  formatWeek,
   insight,
+  parseDay,
   pickFeature,
 } from "./format";
+
+describe("formatWeek", () => {
+  it("writes a week from its Monday, the way the paper and its note say it", () => {
+    expect(formatWeek("2026-11-09")).toBe("9 to 15 Nov");
+    expect(formatWeek("2026-10-26")).toBe("26 Oct to 1 Nov");
+    expect(formatWeek("2026-11-09", true)).toBe("9 to 15 November 2026");
+    expect(formatWeek("2026-10-26", true)).toBe("26 October to 1 November 2026");
+    expect(formatWeek("2026-12-28", true)).toBe("28 December 2026 to 3 January 2027");
+  });
+
+  it("reads a day as a local date, never the day before", () => {
+    const day = parseDay("2026-11-09");
+    expect([day.getFullYear(), day.getMonth(), day.getDate()]).toEqual([2026, 10, 9]);
+  });
+});
 
 const summary = (overrides: Partial<Summary> = {}): Summary => ({
   current: 300,

@@ -18,6 +18,7 @@ It runs on my own computer, and nothing is sent anywhere. The screenshots use de
 - Tracks loyalty-card prices, like Gratis Özel Fiyat
 - Compares the same product across stores per ml or gram
 - Leaves a note in the app and on the desktop when something changes
+- Puts each week on one printable page every Sunday: drops, new lows, fake sales, cheaper stores, price rises and failed checks
 
 Sephora blocks automated checks, and the app doesn't try to get around that.
 

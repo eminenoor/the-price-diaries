@@ -34,6 +34,7 @@ A note is left when:
 - a sale is fake
 - the same product is cheaper at another store
 - the product is back in stock
+- it's Sunday morning: the Sunday paper is ready (once a week; if the app didn't run that Sunday, at the next check)
 
 Each note is sent once. A product's first check never sends one.
 

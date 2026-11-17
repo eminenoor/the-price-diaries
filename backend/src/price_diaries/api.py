@@ -19,17 +19,20 @@ from sqlalchemy.orm import Session
 from price_diaries import migrate
 from price_diaries.analysis import (
     cheaper_elsewhere,
+    paper_week,
     pick_display_name,
     price_anomalies,
     rank_offers,
     saving,
     summarize,
     unit_price,
+    week_start,
 )
 from price_diaries.checker import check_all, check_product, update_size
 from price_diaries.db import Category, Database, Notification, Product
 from price_diaries.fetcher import Fetcher
 from price_diaries.notifications import Notifier, make_notifier, notify_after_check
+from price_diaries.paper import build_paper
 from price_diaries.parsers import STORES, Size, parse_size, with_size
 from price_diaries.scheduler import build_scheduler
 from price_diaries.schemas import (
@@ -43,6 +46,7 @@ from price_diaries.schemas import (
     NoteOut,
     NotesOut,
     OfferOut,
+    PaperOut,
     PricePointOut,
     ProductCreate,
     ProductDetail,
@@ -294,7 +298,22 @@ def _to_detail(session: Session, product: Product, use_member: bool) -> ProductD
 
 def _note_out(note: Notification, products: dict[int, Product]) -> NoteOut:
     """A note, with the product's name as shown everywhere else (its group's name)."""
-    product = products[note.product_id]
+    product = products.get(note.product_id) if note.product_id is not None else None
+    if product is None:  # the Sunday paper
+        return NoteOut(
+            id=note.id,
+            kind=note.kind,  # type: ignore[arg-type]
+            product_id=None,
+            product_name=None,
+            store=None,
+            store_name=None,
+            old_price=None,
+            new_price=None,
+            other_store_name=None,
+            week=note.week,
+            created_at=note.created_at,
+            read=note.read_at is not None,
+        )
     others = (
         [p for p in products.values() if p.group_key == product.group_key and p.id != product.id]
         if product.group_key
@@ -524,6 +543,29 @@ def _register_routes(app: FastAPI) -> None:
             unread=unread or 0,
             notes=[_note_out(n, products) for n in notes],
         )
+
+    @app.get("/api/paper")
+    def get_paper(session: SessionDep, settings: SettingsDep, week: date | None = None) -> PaperOut:
+        """The Sunday paper for the week that ``week`` falls in (Monday to Sunday).
+
+        Without ``week``: the latest paper, this week's on a Sunday, last week's otherwise.
+        """
+        today = date.today()
+        latest = paper_week(today)
+        monday = week_start(week) if week else latest
+        if monday > latest:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "That week's paper isn't out yet.")
+        products = session.scalars(select(Product)).all()
+        groups: dict[str, list[Product]] = {}
+        for p in products:
+            if p.group_key is not None:
+                groups.setdefault(p.group_key, []).append(p)
+
+        def name_of(product: Product) -> str:
+            others = [o for o in groups.get(product.group_key or "", []) if o.id != product.id]
+            return _display_name(product, others)
+
+        return build_paper(session, monday, settings.use_member_prices, today, name_of)
 
     @app.post("/api/notifications/{note_id}/read", status_code=status.HTTP_204_NO_CONTENT)
     def read_note(note_id: int, session: SessionDep) -> None:

@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from price_diaries.db import PricePoint, Product
+from price_diaries.db import CheckFailure, PricePoint, Product
 from price_diaries.fetcher import FetchError, StoreBlockedError
 from price_diaries.parsers import ParsedPrice, PriceNotFoundError, Size, parse_size, store_for_host
 
@@ -97,14 +97,20 @@ def _is_blocked(exc: Exception) -> bool:
     return isinstance(exc, StoreBlockedError) and exc.status != 429
 
 
+def _failed(session: Session, product: Product, exc: Exception, at: datetime) -> None:
+    """Show the error on the product, and keep it for the Sunday paper."""
+    product.last_error = str(exc)[:500]
+    product.blocked = _is_blocked(exc)
+    session.add(CheckFailure(product_id=product.id, error=product.last_error, checked_at=at))
+
+
 async def check_product(
     session: Session, product: Product, source: PageSource, browser_fallback: bool = True
 ) -> CheckOutcome:
     try:
         parsed = await fetch_price(product, source, browser_fallback)
     except (FetchError, PriceNotFoundError) as exc:
-        product.last_error = str(exc)[:500]
-        product.blocked = _is_blocked(exc)
+        _failed(session, product, exc, datetime.now())
         session.commit()
         log.warning("%s: %s", product.name, exc)
         return CheckOutcome(product.id, ok=False, error=product.last_error)
@@ -147,8 +153,7 @@ async def check_all(
     now = datetime.now()
     for product, result in zip(products, prices, strict=True):
         if isinstance(result, (FetchError, PriceNotFoundError)):
-            product.last_error = str(result)[:500]
-            product.blocked = _is_blocked(result)
+            _failed(session, product, result, now)
             outcomes.append(CheckOutcome(product.id, ok=False, error=product.last_error))
         elif isinstance(result, BaseException):
             raise result

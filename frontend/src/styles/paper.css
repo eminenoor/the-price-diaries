@@ -1,0 +1,328 @@
+/* ---------- The Sunday paper ---------- */
+/* Night: one sheet of newsprint taped up in the dark, tilted a little. Quiet: a plain
+   poster with 2px rules. Print: one A4 page, whatever the mode. Rules and marks use
+   currentColor, so they follow the ink in every mode. */
+
+.sunday-paper {
+  display: block;
+  max-width: 62rem;
+  margin: var(--space-4) auto var(--space-3);
+  padding: clamp(1.25rem, 4vw, 3rem);
+  transform: rotate(var(--tilt, 0deg));
+}
+
+/* Masthead: centred, like the front page of a weekend paper. */
+.sunday-paper__masthead {
+  text-align: center;
+}
+
+.sunday-paper__title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: clamp(3rem, 11vw, 7.5rem);
+  letter-spacing: -0.06em;
+  line-height: 0.85;
+}
+
+.sunday-paper__the {
+  margin-bottom: 0.12em;
+  font-family: var(--font-text);
+  font-weight: 500;
+  font-style: italic;
+  font-size: max(0.2em, var(--step-1));
+  letter-spacing: 0;
+}
+
+/* The dateline between two rules, split left and right. */
+.sunday-paper__dateline {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-1) 0;
+  border-block: 2px solid currentColor;
+  font-weight: 700;
+  font-size: var(--step--1);
+}
+
+.sunday-paper__quiet {
+  margin: var(--space-5) auto var(--space-4);
+  max-width: 32ch;
+  text-align: center;
+  font-weight: 700;
+  font-size: var(--step-1);
+  text-wrap: balance;
+}
+
+/* The lead story: an asymmetric headline across the full width. */
+.paper-lead {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-1) var(--space-4);
+  align-items: end;
+  padding: var(--space-3) 0;
+  border-bottom: 2px solid currentColor;
+}
+
+.paper-lead__kicker {
+  grid-column: 1 / -1;
+  font-weight: 700;
+  font-size: var(--step--1);
+}
+
+.paper-lead__headline {
+  font-size: var(--step-3);
+  line-height: 1;
+  text-wrap: balance;
+}
+
+.paper-lead__headline a {
+  text-decoration: none;
+}
+
+.paper-lead__headline a:hover {
+  text-decoration: underline;
+}
+
+.paper-lead__prices {
+  text-align: right;
+  line-height: 1.6;
+}
+
+.paper-lead__hand {
+  position: absolute;
+  top: var(--space-2);
+  right: 0;
+  transform: rotate(-2deg);
+}
+
+/* Short handwritten margin notes, in the ink of the page (pencil red only for warnings,
+   in quiet mode: on paper it's too faint for text). */
+.paper-hand {
+  font-family: var(--font-hand);
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+/* Newspaper columns with a rule between them; one column on a phone. */
+.sunday-paper__columns {
+  columns: 2 20rem;
+  column-gap: var(--space-5);
+  column-rule: 2px solid currentColor;
+  margin-top: var(--space-3);
+}
+
+.paper-section {
+  break-inside: avoid;
+  padding-bottom: var(--space-3);
+}
+
+.paper-section__title {
+  margin-bottom: var(--space-1);
+  font-size: var(--step-2);
+}
+
+.paper-section__title span {
+  display: inline-block;
+  padding: 0.05em 0.25em 0.12em;
+}
+
+.paper-section--deal .paper-section__title span {
+  background: var(--mustard);
+  color: var(--ink);
+}
+
+.paper-section--warning .paper-section__title span {
+  background: var(--rouge);
+  color: var(--on-rouge);
+}
+
+.paper-section--plain .paper-section__title span {
+  padding-inline: 0;
+  border-bottom: 2px solid currentColor;
+}
+
+.paper-section .paper-hand {
+  margin: var(--space-1) 0 var(--space-1) auto;
+  width: fit-content;
+  transform: rotate(-1.5deg);
+}
+
+.paper-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paper-list li {
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid currentColor;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+.paper-list li:last-child {
+  border-bottom: 0;
+}
+
+.paper-list a {
+  font-weight: 700;
+}
+
+/* "and 3 more" only matters on paper: the screen shows every item. */
+.paper-list__more {
+  display: none;
+  font-weight: 700;
+  font-size: var(--step--1);
+}
+
+/* The yellow focus ring is meant for the night sky; on paper, use ink. */
+.sunday-paper a:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.paper-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 62rem;
+  margin: 0 auto;
+}
+
+@media (max-width: 640px) {
+  .paper-lead {
+    grid-template-columns: 1fr;
+  }
+
+  .paper-lead__prices {
+    text-align: left;
+  }
+
+  .paper-lead__hand {
+    position: static;
+    justify-self: end;
+  }
+
+  .paper-nav {
+    justify-content: center;
+  }
+}
+
+/* ---------- Quiet mode: a daylight poster, no tilt ---------- */
+
+:root[data-mode="quiet"] .sunday-paper {
+  padding-inline: 0;
+}
+
+:root[data-mode="quiet"] .paper-hand {
+  transform: none;
+}
+
+:root[data-mode="quiet"] .paper-section__title span {
+  background: transparent;
+  color: inherit;
+  padding-inline: 0;
+  border-bottom: 2px solid currentColor;
+}
+
+:root[data-mode="quiet"] .paper-section--warning .paper-section__title span,
+:root[data-mode="quiet"] .paper-section--warning .paper-hand {
+  color: var(--pencil);
+}
+
+:root[data-mode="quiet"] .sunday-paper a:focus-visible {
+  outline-color: var(--focus);
+}
+
+/* ---------- Print: one A4 page, plain ink on white ---------- */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  .topbar,
+  .colophon,
+  .paper-nav,
+  .paper-list__extra {
+    display: none !important;
+  }
+
+  .page {
+    max-width: none;
+    padding: 0;
+  }
+
+  :root:not([data-mode="quiet"]) body {
+    background: var(--bg);
+  }
+
+  .sunday-paper {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    transform: none;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .sunday-paper.paper--taped::before {
+    display: none;
+  }
+
+  .sunday-paper__title {
+    font-size: 4.25rem;
+  }
+
+  .paper-lead {
+    padding: var(--space-2) 0;
+  }
+
+  .paper-lead__headline {
+    font-size: var(--step-2);
+  }
+
+  .sunday-paper__columns {
+    column-count: 2;
+    column-gap: var(--space-4);
+  }
+
+  .paper-section {
+    padding-bottom: var(--space-2);
+  }
+
+  .paper-section__title {
+    font-size: var(--step-1);
+  }
+
+  .paper-section__title span,
+  .paper-section--deal .paper-section__title span,
+  .paper-section--warning .paper-section__title span {
+    print-color-adjust: exact;
+  }
+
+  .paper-list li {
+    padding: 0.2rem 0;
+    font-size: var(--step--1);
+    line-height: 1.35;
+  }
+
+  .paper-list__more {
+    display: block;
+  }
+
+  .paper-hand {
+    font-size: 1.4rem;
+  }
+
+  .sunday-paper a {
+    text-decoration: none;
+  }
+}

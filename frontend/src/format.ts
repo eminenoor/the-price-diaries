@@ -31,6 +31,30 @@ export function formatDate(iso: string): string {
   return shortDate.format(new Date(iso));
 }
 
+/** "2026-11-09" as a local date (new Date() would read it as UTC midnight). */
+export function parseDay(day: string): Date {
+  const [year, month, date] = day.slice(0, 10).split("-").map(Number);
+  return new Date(year, month - 1, date);
+}
+
+const dayOnly = new Intl.DateTimeFormat("en-GB", { day: "numeric" });
+const longDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
+const dayMonthLong = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long" });
+
+/**
+ * A week from its Monday: "9 to 15 Nov", or "26 Oct to 1 Nov" across two months.
+ * With `long`: "9 to 15 November 2026", the paper's dateline.
+ */
+export function formatWeek(monday: string, long = false): string {
+  const start = parseDay(monday);
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  const sameMonth = start.getMonth() === end.getMonth();
+  if (!long) return `${sameMonth ? dayOnly.format(start) : shortDate.format(start)} to ${shortDate.format(end)}`;
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const first = sameMonth ? dayOnly.format(start) : sameYear ? dayMonthLong.format(start) : longDate.format(start);
+  return `${first} to ${longDate.format(end)}`;
+}
+
 const clock = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 /** 09:17 */

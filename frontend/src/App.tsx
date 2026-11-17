@@ -6,6 +6,7 @@ import { useMode } from "./mode";
 import { AddPage } from "./pages/AddPage";
 import { IndexPage } from "./pages/IndexPage";
 import { NotesPage } from "./pages/NotesPage";
+import { PaperPage } from "./pages/PaperPage";
 import { ProductPage } from "./pages/ProductPage";
 import { unreadLabel } from "./scene";
 
@@ -20,6 +21,7 @@ export function App() {
           <Route path="/add" element={<AddPage />} />
           <Route path="/products/:id" element={<ProductPage />} />
           <Route path="/notes" element={<NotesPage />} />
+          <Route path="/paper" element={<PaperPage />} />
           <Route
             path="*"
             element={
@@ -52,6 +54,9 @@ export function TopBar() {
         The Price Diaries
       </Link>
       <div className="topbar__actions">
+        <Link className="notes-link" to="/paper" aria-current={path === "/paper" ? "page" : undefined}>
+          Sunday paper
+        </Link>
         <Link className="notes-link" to="/notes" aria-current={path === "/notes" ? "page" : undefined}>
           Notes
           {unread && (

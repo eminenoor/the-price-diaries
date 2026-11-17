@@ -362,14 +362,16 @@ def test_demo_fills_the_inbox_without_desktop_notifications(client, desktop):
     with client.app.state.db.session() as session:
         seed_demo(session)
     inbox = client.get("/api/notifications").json()
-    assert len(inbox["notes"]) == len(DEMO_NOTES)
-    assert inbox["unread"] == sum(not read for *_, read in DEMO_NOTES)
+    # Plus, in the Sunday paper's week, a cheaper find (read) and the paper itself (new).
+    assert len(inbox["notes"]) == len(DEMO_NOTES) + 2
+    assert inbox["unread"] == sum(not read for *_, read in DEMO_NOTES) + 1
     assert {n["kind"] for n in inbox["notes"]} == {
         "target",
         "lowest",
         "fake_sale",
         "cheaper",
         "back_in_stock",
+        "sunday_paper",
     }
     cheaper = next(n for n in inbox["notes"] if n["kind"] == "cheaper")
     assert cheaper["other_store_name"] == "Watsons" and cheaper["new_price"] < cheaper["old_price"]
