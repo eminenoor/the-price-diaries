@@ -47,8 +47,7 @@ export function NightWindow({ product, storeName, room }: NightWindowProps) {
             {storeName}
             {room && (
               <>
-                <span aria-hidden="true"> · </span>
-                <span className="visually-hidden">, </span>
+                {", "}
                 {room.name.toLowerCase()}
               </>
             )}

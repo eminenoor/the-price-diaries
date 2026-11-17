@@ -207,7 +207,7 @@ describe("pencilNotes", () => {
     const s = summary({ current: 300, lowest: 268.22, highest: 360, lowest_30d: 268.22 });
     const notes = pencilNotes(history, s, 250);
     expect(notes.map((n) => [n.kind, n.text])).toEqual([
-      ["lowest", "lowest ₺268,22 · 3 Nov"],
+      ["lowest", "lowest ₺268,22 on 3 Nov"],
       ["highest", "highest ₺360,00"],
       ["alert", "alert ₺250,00"],
     ]);
@@ -233,7 +233,7 @@ describe("layoutNotes", () => {
     const low = line.reduce((a, b) => (b.y >= a.y ? b : a)); // lowest price = largest y
     const high = line.reduce((a, b) => (b.y <= a.y ? b : a));
     const notes: NoteToPlace[] = [
-      { kind: "lowest", text: "lowest ₺268,22 · 11 Nov", at: low },
+      { kind: "lowest", text: "lowest ₺268,22 on 11 Nov", at: low },
       { kind: "highest", text: "highest ₺320,00", at: high },
     ];
     if (alertY !== null) notes.push({ kind: "alert", text: "alert ₺250,00", at: null });

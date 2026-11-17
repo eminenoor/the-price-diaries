@@ -802,14 +802,10 @@ dependencies = [
     { name = "desktop-notifier" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "playwright" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy" },
     { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.optional-dependencies]
-browser = [
-    { name = "playwright" },
 ]
 
 [package.dev-dependencies]
@@ -829,12 +825,11 @@ requires-dist = [
     { name = "desktop-notifier", specifier = ">=6" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
-    { name = "playwright", marker = "extra == 'browser'", specifier = ">=1.47" },
+    { name = "playwright", specifier = ">=1.47" },
     { name = "pydantic-settings", specifier = ">=2.4" },
     { name = "sqlalchemy", specifier = ">=2.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
-provides-extras = ["browser"]
 
 [package.metadata.requires-dev]
 dev = [

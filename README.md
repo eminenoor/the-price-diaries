@@ -15,6 +15,10 @@
 
 Beauty retailers change prices almost daily. A common pattern is to raise a price, then "discount" it back to where it was a few days later. Without a record, it's impossible to remember whether today's price is actually good. The Price Diaries keeps that record for you.
 
+## Why not Akakçe or Cimri?
+
+Akakçe and Cimri compare prices across stores right now. The Price Diaries keeps a long, private history of just the products you care about, catches discounts that only undo a recent price rise, and runs only on your own computer.
+
 ## Features
 
 - **Daily automatic checks** for Gratis, Trendyol, Amazon, Watsons, Rossmann, Eve Shop and Sephora, plus a "check now" button.
@@ -59,7 +63,7 @@ There are two complementary checks in [`analysis.py`](backend/src/price_diaries/
 
 **Unusual rise (statistical).** Day-to-day log returns are scored with the *modified z-score* (Iglewicz & Hoaglin, 1993):
 
-$$M_i = \frac{0.6745\,(r_i - \tilde{r})}{\text{MAD}}$$
+$$M_i = \frac{0.6745 (r_i - \tilde{r})}{\text{MAD}}$$
 
 where $\tilde{r}$ is the median return and MAD is the median absolute deviation. Rises with $M_i > 3.5$ are flagged. Median and MAD are used instead of mean and standard deviation because they are not distorted by the very spikes we're looking for. The threshold also adapts to each product: one that changes price daily needs a bigger jump to be flagged than one that's usually stable.
 
@@ -68,7 +72,7 @@ where $\tilde{r}$ is the median return and MAD is the median absolute deviation.
 | Area | Tools |
 | --- | --- |
 | Backend | Python 3.11+, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic, APScheduler |
-| Scraping | httpx (async), BeautifulSoup, Playwright (optional) |
+| Scraping | httpx (async), BeautifulSoup, Playwright |
 | Frontend | React 19, TypeScript (strict), Vite, TanStack Query, React Router, Observable Plot |
 | Styling | Hand-written CSS with design tokens, self-hosted Bricolage Grotesque, Figtree and Nanum Pen Script |
 | Quality | pytest, Vitest, Testing Library, Ruff, pre-commit, GitHub Actions |
@@ -85,7 +89,7 @@ cd the-price-diaries
 # Backend
 cd backend
 uv sync
-uv run price-diaries demo        # optional: adds 12 demo products across all four floors
+uv run price-diaries demo        # optional: adds 16 demo products across five floors
 uv run price-diaries serve       # API on http://127.0.0.1:8000
 
 # Frontend, in a second terminal
@@ -96,11 +100,10 @@ npm run dev                      # open http://127.0.0.1:5173
 
 ### Stores that need a browser
 
-Trendyol and Sephora render prices with JavaScript, and other stores sometimes do too. Install the optional browser support once:
+Trendyol and Sephora render prices with JavaScript, and other stores sometimes do too. `uv sync` installs Playwright; download its browser once:
 
 ```bash
 cd backend
-uv sync --extra browser
 uv run playwright install chromium
 ```
 
@@ -158,6 +161,27 @@ Copy `backend/.env.example` to `backend/.env` to change the check time, delays, 
 | `npm test` | Frontend tests |
 
 Interactive API docs are available at `http://127.0.0.1:8000/docs` while the server runs.
+
+## Development
+
+Install the dependencies and the pre-commit hooks, which format Python code and check commit messages:
+
+```bash
+cd backend && uv sync && cd ..
+cd frontend && npm install && cd ..
+uvx pre-commit install --hook-type pre-commit --hook-type commit-msg
+```
+
+Run the tests and linters before opening a pull request:
+
+```bash
+cd backend && uv run ruff check . && uv run ruff format --check . && uv run pytest
+cd frontend && npm run lint && npm test && npm run build
+```
+
+### Adding a store
+
+Each store is one `Store(...)` entry in [`parsers/sites.py`](backend/src/price_diaries/parsers/sites.py): its name, domains, and, when needed, price selectors, whether it needs a browser, and the labels it puts next to loyalty-card prices. Run `uv run price-diaries inspect <url>` on a product page to see what each parsing strategy finds, then add tests for the store in `backend/tests/test_parsers.py`.
 
 ## Project structure
 

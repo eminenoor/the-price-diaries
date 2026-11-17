@@ -15,12 +15,10 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "apscheduler>=3.10,<4",
     "desktop-notifier>=6",
+    # Real browser for stores that render prices with JavaScript.
+    # After installing: `uv run playwright install chromium`
+    "playwright>=1.47",
 ]
-
-[project.optional-dependencies]
-# Real browser for stores that render prices with JavaScript.
-# After installing: `uv run playwright install chromium`
-browser = ["playwright>=1.47"]
 
 [project.scripts]
 price-diaries = "price_diaries.cli:main"

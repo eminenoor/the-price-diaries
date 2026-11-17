@@ -107,7 +107,7 @@ class Fetcher:
         except ImportError as exc:
             raise FetchError(
                 "This store needs a browser. Install it with: "
-                "uv sync --extra browser && uv run playwright install chromium"
+                "uv sync && uv run playwright install chromium"
             ) from exc
 
         host = urlsplit(url).hostname or ""

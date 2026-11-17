@@ -75,8 +75,8 @@ describe("formatSize", () => {
 
 describe("formatCheck", () => {
   it("writes date, time and a Turkish price, the way the chart tooltip shows it", () => {
-    expect(formatCheck(new Date(2026, 10, 10, 9, 17), 268.22)).toBe("10 Nov, 09:17 · ₺268,22");
-    expect(formatCheck(new Date(2026, 0, 3, 21, 5), 1299.9)).toBe("3 Jan, 21:05 · ₺1.299,90");
+    expect(formatCheck(new Date(2026, 10, 10, 9, 17), 268.22)).toBe("10 Nov, 09:17, ₺268,22");
+    expect(formatCheck(new Date(2026, 0, 3, 21, 5), 1299.9)).toBe("3 Jan, 21:05, ₺1.299,90");
   });
 });
 

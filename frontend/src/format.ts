@@ -38,9 +38,9 @@ export function formatTime(date: Date): string {
   return clock.format(date);
 }
 
-/** One check, as the chart tooltip shows it: "10 Nov, 09:17 · ₺268,22". */
+/** One check, as the chart tooltip shows it: "10 Nov, 09:17, ₺268,22". */
 export function formatCheck(date: Date, price: number): string {
-  return `${shortDate.format(date)}, ${formatTime(date)} · ₺${formatPrice(price)}`;
+  return `${shortDate.format(date)}, ${formatTime(date)}, ₺${formatPrice(price)}`;
 }
 
 export function formatChange(pct: number): string {

@@ -97,7 +97,7 @@ export function statsOf(s: Summary): Stat[] {
 
 export interface PencilNote {
   kind: "lowest" | "highest" | "low30" | "alert";
-  /** Handwritten, short: "lowest ₺378,89 · 11 Nov". */
+  /** Handwritten, short: "lowest ₺378,89 on 11 Nov". */
   text: string;
   /** The point the note is about (for the alert, the line's height). */
   date: Date | null;
@@ -122,7 +122,7 @@ export function pencilNotes(
   const low = points.reduce((a, b) => (b.price <= a.price ? b : a));
   notes.push({
     kind: "lowest",
-    text: `lowest ₺${formatPrice(low.price)} · ${formatDate(low.date.toISOString())}`,
+    text: `lowest ₺${formatPrice(low.price)} on ${formatDate(low.date.toISOString())}`,
     ...low,
   });
 
