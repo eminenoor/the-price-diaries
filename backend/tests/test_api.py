@@ -1,3 +1,9 @@
+import logging
+from datetime import date, timedelta
+
+from fastapi.testclient import TestClient
+
+from price_diaries.api import create_app
 from price_diaries.fetcher import StoreBlockedError
 from tests.conftest import FakeFetcher
 
@@ -349,6 +355,29 @@ def test_home_notes_a_cheaper_store(client, fake_pages):
         "saving": 60,
     }
     assert products[watsons]["cheaper_elsewhere"] is None  # it's the cheaper one
+
+
+def test_the_app_says_when_pd_today_is_set(settings, caplog):
+    with TestClient(create_app(settings)) as plain:
+        assert plain.get("/api/app").json() == {"set_date": None}
+    assert "PD_TODAY" not in caplog.text
+
+    settings.today = date(2026, 12, 1)
+    with caplog.at_level(logging.WARNING), TestClient(create_app(settings)) as demo:
+        assert demo.get("/api/app").json() == {"set_date": "2026-12-01"}
+    assert "PD_TODAY is set: the app treats 1 Dec 2026 as today, not the real date" in caplog.text
+
+
+def test_pd_today_sets_the_day_the_app_shows(client, fake_pages):
+    gratis, _ = two_stores(client, fake_pages)
+    # On another day, today's checks aren't today's any more, so there's no cheaper store.
+    client.app.state.settings.today = date.today() + timedelta(days=1)
+    products = {p["id"]: p for p in client.get("/api/products").json()}
+    assert products[gratis]["cheaper_elsewhere"] is None
+    # And the latest paper is that day's: on Wednesday 18 November, the week of the 9th.
+    client.app.state.settings.today = date(2026, 11, 18)
+    assert client.get("/api/paper").json()["week_start"] == "2026-11-09"
+    assert client.get("/api/paper?week=2026-11-16").status_code == 404
 
 
 def test_cheaper_elsewhere_uses_member_price(client, fake_pages):

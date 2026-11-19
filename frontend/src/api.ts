@@ -1,5 +1,10 @@
 // Types mirror backend/src/price_diaries/schemas.py.
 
+/** How the app runs. set_date: the day PD_TODAY sets (the demo), as "2026-12-01". */
+export interface AppInfo {
+  set_date: string | null;
+}
+
 export interface Store {
   key: string;
   name: string;
@@ -272,6 +277,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  app: () => request<AppInfo>("/app"),
   stores: () => request<Store[]>("/stores"),
   categories: () => request<Category[]>("/categories"),
   createCategory: (body: NewCategory) =>

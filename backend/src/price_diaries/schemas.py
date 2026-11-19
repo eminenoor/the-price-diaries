@@ -8,6 +8,11 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class AppInfo(BaseModel):
+    # The day the app treats as today when PD_TODAY is set (the demo), else None.
+    set_date: date | None
+
+
 class StoreOut(BaseModel):
     key: str
     name: str

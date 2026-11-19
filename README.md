@@ -4,9 +4,9 @@ I kept losing track of skincare prices. A serum would go up one week and come ba
 
 ![The Price Diaries at night](docs/screenshots/home.png)
 
-| Product detail | On a phone |
-| --- | --- |
-| ![Product page: a lit window, the price on mustard paper, a chart on torn paper and the history as liner notes](docs/screenshots/detail.png) | ![Quiet mode on a phone: a daylight poster with red pencil circles around good deals](docs/screenshots/mobile.png) |
+| Product detail | The Sunday paper | On a phone |
+| --- | --- | --- |
+| ![Product page: a lit window, the price on mustard paper, the same toner at two other stores and a chart on torn paper](docs/screenshots/detail.png) | ![The Sunday paper for the week of Efsane Cuma: drops, new lows, fake sales caught, a cheaper store, price rises and failed checks on one printed page](docs/screenshots/paper.png) | ![Quiet mode on a phone: a daylight poster with red pencil circles around good deals](docs/screenshots/mobile.png) |
 
 It runs on my own computer, and nothing is sent anywhere. The screenshots use demo data.
 
@@ -47,13 +47,14 @@ You need [uv](https://docs.astral.sh/uv/) and Node.js 22+.
 cd backend
 uv sync
 uv run playwright install chromium
-uv run price-diaries demo     # optional demo data
 uv run price-diaries serve
 
 cd ../frontend
 npm install
 npm run dev                   # http://127.0.0.1:5173
 ```
+
+To try it with demo data first, run `uv run price-diaries demo` and then `uv run price-diaries serve --demo`. The demo has its own database (`data/demo.db`), so it never touches your real prices.
 
 More commands and settings are in [docs/usage.md](docs/usage.md).
 

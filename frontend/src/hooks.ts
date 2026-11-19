@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, type NewCategory, type NewProduct } from "./api";
 
+export const useAppInfo = () => useQuery({ queryKey: ["app"], queryFn: api.app, staleTime: Infinity });
+
 export const useStores = () =>
   useQuery({ queryKey: ["stores"], queryFn: api.stores, staleTime: Infinity });
 

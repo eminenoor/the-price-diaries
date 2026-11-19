@@ -1,5 +1,6 @@
 """App configuration, read from environment variables or a .env file."""
 
+from datetime import date
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,6 +10,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PD_", env_file=".env", extra="ignore")
 
     database_url: str = "sqlite:///./data/prices.db"
+    # Where `price-diaries demo` writes, and what `serve --demo` opens. Never your real prices.
+    demo_database_url: str = "sqlite:///./data/demo.db"
     # Daily automatic check, in local time.
     check_hour: int = 9
     check_minute: int = 17
@@ -26,6 +29,13 @@ class Settings(BaseSettings):
     # Built frontend (npm run build). Served at / when it exists.
     frontend_dir: str | None = "../frontend/dist"
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    # Show the app as it looks on this day: which prices count as "checked today" and which
+    # Sunday paper is the latest. For the demo data (PD_TODAY=2026-12-01); leave it unset
+    # for daily use. Checks still record the real time.
+    today: date | None = None
+
+    def current_date(self) -> date:
+        return self.today or date.today()
 
 
 @lru_cache

@@ -4,7 +4,7 @@
  * No React here, so all of it is unit-tested in scene.test.ts.
  */
 import type { Category, NoteKind, Paper, PaperMove, Product, Summary } from "./api";
-import { formatChange, formatDate, formatPrice, pickFeature } from "./format";
+import { formatChange, formatDate, formatPrice, parseDay, pickFeature } from "./format";
 
 // --- window state -------------------------------------------------------------
 
@@ -692,6 +692,13 @@ export function checkedLine(count: number): string {
 /** "down 12.0%" or "up 3.0%", in words. */
 export function moveWords(pct: number): string {
   return `${pct < 0 ? "down" : "up"} ${formatChange(pct).slice(1)}`;
+}
+
+const demoDay = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+/** The header's reminder that PD_TODAY is set: "demo date: 1 Dec 2026", or nothing. */
+export function demoDateLabel(setDate: string | null | undefined): string {
+  return setDate ? `demo date: ${demoDay.format(parseDay(setDate))}` : "";
 }
 
 /** The header's count: "2 new", or nothing when every note is read. */

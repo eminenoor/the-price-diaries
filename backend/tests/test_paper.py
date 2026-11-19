@@ -14,7 +14,6 @@ from price_diaries.analysis import (
     week_story,
 )
 from price_diaries.db import CheckFailure, Notification, PricePoint, Product
-from price_diaries.demo import seed_demo
 from price_diaries.paper import build_paper, paper_note_text, publish_paper, week_words
 from tests.conftest import FakeDesktop
 
@@ -353,29 +352,28 @@ def test_the_note_reads_like_the_desktop_notification():
 # --- the demo --------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("day", range(16, 23))  # Monday 16 to Sunday 22 November
-def test_the_demo_fills_the_paper_on_any_day_of_the_week(client, day):
-    today = date(2026, 11, day)
-    with client.app.state.db.session() as session:
-        seed_demo(session, now=at(today))
-        week = paper(session, paper_week(today), today)
-    for section in ("drops", "new_lows", "fake_sales", "cheaper", "rises", "trouble"):
-        assert getattr(week, section), (today, section)
-    # Today's states are still the scripted ones (see test_demo.py).
-    products = {p["listing_name"]: p for p in client.get("/api/products").json()}
-    assert products["Laundry Liquid 2.5 l"]["summary"]["fake_sale"]
-    assert products["Vitamin C 15% Serum 30 ml"]["summary"]["is_all_time_low"]
-    assert products["Gentle Foaming Cleanser 150 ml"]["summary"]["change_pct"] > 0
-    assert products["Vitamin D3 1000 IU, 90 tablets"]["summary"]["change_pct"] == 0
+@pytest.mark.parametrize("monday", [date(2026, 11, 9), date(2026, 11, 16), date(2026, 11, 23)])
+def test_every_demo_paper_in_the_inbox_has_news(demo_client, monday):
+    notes = demo_client.get("/api/notifications").json()["notes"]
+    assert monday.isoformat() in {n["week"] for n in notes if n["kind"] == "sunday_paper"}
+    week = demo_client.get(f"/api/paper?week={monday}").json()
+    assert week["products_checked"] >= 30
+    assert week["drops"] or week["rises"] or week["fake_sales"]
 
 
-def test_the_demo_fills_every_section_of_the_latest_paper(client):
-    with client.app.state.db.session() as session:
-        seed_demo(session)
-    week = client.get("/api/paper").json()
+def test_the_latest_demo_paper_is_efsane_cuma_week_with_every_section(demo_client):
+    week = demo_client.get("/api/paper").json()
+    assert week["week_start"] == "2026-11-23"
     for section in ("drops", "new_lows", "fake_sales", "cheaper", "rises", "trouble"):
         assert week[section], section
+    # Efsane Cuma: most products are cheaper on Sunday than before the week, some by a lot.
+    assert len(week["drops"]) >= 15 and week["drops"][0]["change_pct"] <= -20
+    fakes = {f["name"] for f in week["fake_sales"]}
+    # Raised then "discounted", and a spike just before the campaign.
+    assert {"Laundry Liquid 2.5 l", "Hyaluronic Acid Serum 30 ml"} <= fakes
+    assert week["cheaper"][0]["other_store_name"] == "Trendyol"
     trouble = {t["name"]: t for t in week["trouble"]}
-    assert trouble["Ceramide Barrier Cream 50 ml"]["failed_checks"] >= 2
+    assert trouble["Ceramide Barrier Cream 50 ml"]["failed_checks"] == 3  # blocked since Friday
+    assert trouble["Vitamin C 15% Serum 30 ml"]["failed_checks"] == 1
     assert trouble["Vitamin D3 1000 IU, 90 tablets"]["out_of_stock_at"] is not None
     assert week["previous_week"] is not None and week["next_week"] is None

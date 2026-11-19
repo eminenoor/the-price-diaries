@@ -76,3 +76,14 @@ def fake_pages(monkeypatch) -> dict[str, str]:
 def client(settings, fake_pages) -> Iterator[TestClient]:
     with TestClient(create_app(settings)) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def demo_client(client) -> TestClient:
+    """The demo data, seen on its day (PD_TODAY=2026-12-01)."""
+    from price_diaries.demo import DEMO_TODAY, seed_demo
+
+    client.app.state.settings.today = DEMO_TODAY
+    with client.app.state.db.session() as session:
+        seed_demo(session)
+    return client

@@ -20,10 +20,13 @@ def main(argv: list[str] | None = None) -> int:
     serve = sub.add_parser("serve", help="run the API and the daily scheduler")
     serve.add_argument("--port", type=int, default=8000)
     serve.add_argument("--reload", action="store_true", help="restart on code changes")
+    serve.add_argument(
+        "--demo", action="store_true", help="show the demo database on its day, with no checks"
+    )
     sub.add_parser("check", help="check all prices once, now")
     sub.add_parser("migrate", help="create or update the database schema")
-    demo = sub.add_parser("demo", help="add fake products with 90 days of history")
-    demo.add_argument("--days", type=int, default=90)
+    demo = sub.add_parser("demo", help="add fake products with 180 days of history")
+    demo.add_argument("--days", type=int, default=180)
     inspect = sub.add_parser("inspect", help="show what the tracker finds on a product page")
     inspect.add_argument("url")
     inspect.add_argument("--browser", action="store_true", help="also load the page in Chromium")
@@ -43,6 +46,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "serve":
         import uvicorn
 
+        if args.demo:
+            _use_demo(settings.demo_database_url)
         # 127.0.0.1 only: the app has no login, so it must not be reachable from the network.
         uvicorn.run("price_diaries.main:app", host="127.0.0.1", port=args.port, reload=args.reload)
         return 0
@@ -53,6 +58,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "notify":
         return asyncio.run(_notify_test(settings.desktop_notifications))
 
+    if args.command == "demo":
+        return _demo(args.days, settings.database_url, settings.demo_database_url)
+
     migrate.upgrade(settings.database_url)
     if args.command == "migrate":
         print("Database is up to date.")
@@ -60,13 +68,54 @@ def main(argv: list[str] | None = None) -> int:
         from price_diaries.scheduler import run_daily_check
 
         asyncio.run(run_daily_check(Database(settings.database_url), settings))
-    elif args.command == "demo":
-        from price_diaries.demo import seed_demo
-
-        with Database(settings.database_url).session() as session:
-            count = seed_demo(session, days=args.days)
-        print(f"Added {count} demo products.")
     return 0
+
+
+def _demo(days: int, real_url: str, demo_url: str) -> int:
+    """Seed the demo into its own database, never the real one."""
+    from sqlalchemy import func, select
+
+    from price_diaries.db import Product
+    from price_diaries.demo import DEMO_TODAY, seed_demo
+
+    if _same_database(real_url, demo_url):
+        print(
+            "PD_DEMO_DATABASE_URL points at your real database, so the demo wasn't added. "
+            "Give the demo a file of its own."
+        )
+        return 1
+    migrate.upgrade(demo_url)
+    shown = demo_url.removeprefix("sqlite:///")
+    with Database(demo_url).session() as session:
+        if session.scalar(select(func.count()).select_from(Product)):
+            print(f"The demo is already in {shown}. Delete that file to start it again.")
+            return 1
+        count = seed_demo(session, days=days)
+    day = f"{DEMO_TODAY.day} {DEMO_TODAY:%B %Y}"
+    print(f"Added {count} demo products to {shown}, as they are on {day}.")
+    print("See them with: uv run price-diaries serve --demo")
+    return 0
+
+
+def _same_database(a: str, b: str) -> bool:
+    def where(url: str) -> str:
+        if url.startswith("sqlite:///") and ":memory:" not in url:
+            return str(Path(url.removeprefix("sqlite:///")).resolve()).casefold()
+        return url
+
+    return where(a) == where(b)
+
+
+def _use_demo(demo_url: str) -> None:
+    """`serve --demo`: the demo database, on the demo's day, without the daily check."""
+    import os
+
+    from price_diaries.demo import DEMO_TODAY
+
+    os.environ["PD_DATABASE_URL"] = demo_url
+    os.environ["PD_TODAY"] = DEMO_TODAY.isoformat()
+    os.environ["PD_SCHEDULER_ENABLED"] = "false"
+    get_settings.cache_clear()  # the app reads its settings again, with these
 
 
 async def _inspect(url: str, browser: bool, save: str | None) -> int:

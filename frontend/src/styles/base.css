@@ -161,6 +161,24 @@ code {
   color: var(--text-dim);
 }
 
+/* PD_TODAY is set: a paper tag hanging from the top edge, so a pretend date is never
+   mistaken for today. */
+.demo-date {
+  width: fit-content;
+  margin: 0 auto;
+  padding: 0.35em 0.8em;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: var(--step--1);
+  font-weight: 700;
+}
+
+:root[data-mode="quiet"] .demo-date {
+  background: transparent;
+  color: var(--text);
+  border: 2px solid var(--rule);
+}
+
 /* ---------- Price ---------- */
 
 .price {

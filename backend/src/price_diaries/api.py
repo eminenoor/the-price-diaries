@@ -37,6 +37,7 @@ from price_diaries.parsers import STORES, Size, parse_size, with_size
 from price_diaries.scheduler import build_scheduler
 from price_diaries.schemas import (
     AnomalyOut,
+    AppInfo,
     CategoryCreate,
     CategoryOut,
     CategoryUpdate,
@@ -70,6 +71,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         migrate.upgrade(settings.database_url)
+        if settings.today:
+            log.warning(
+                "PD_TODAY is set: the app treats %s as today, not the real date. "
+                "Unset PD_TODAY for daily use.",
+                f"{settings.today.day} {settings.today:%b %Y}",
+            )
         scheduler = None
         if settings.scheduler_enabled:
             scheduler = build_scheduler(db, settings, app.state.notifier)
@@ -202,13 +209,13 @@ def _unit_price_out(price: float, product: Product) -> UnitPriceOut | None:
 
 
 def _cheaper_elsewhere(
-    product: Product, others: Sequence[Product], use_member: bool
+    product: Product, others: Sequence[Product], use_member: bool, today: date
 ) -> ElsewhereNote | None:
     here = product.offer(use_member)
     if here is None:
         return None
     offers = [o for o in (p.offer(use_member) for p in others) if o is not None]
-    best = cheaper_elsewhere(here, offers, date.today())
+    best = cheaper_elsewhere(here, offers, today)
     if best is None:
         return None
     there = next(p for p in others if p.id == best[0].product_id)
@@ -229,7 +236,8 @@ def _display_name(product: Product, others: Sequence[Product]) -> str:
     return with_size(name, size, product.name)
 
 
-def _to_out(product: Product, use_member: bool, others: Sequence[Product] = ()) -> ProductOut:
+def _to_out(product: Product, settings: Settings, others: Sequence[Product] = ()) -> ProductOut:
+    use_member = settings.use_member_prices
     history = _history(product, use_member)
     summary = summarize(history)
     latest = product.prices[-1] if product.prices else None
@@ -260,7 +268,7 @@ def _to_out(product: Product, use_member: bool, others: Sequence[Product] = ()) 
         size=size,
         unit_price=per_unit,
         gtin=product.gtin,
-        cheaper_elsewhere=_cheaper_elsewhere(product, others, use_member),
+        cheaper_elsewhere=_cheaper_elsewhere(product, others, use_member, settings.current_date()),
     )
 
 
@@ -285,11 +293,12 @@ def _elsewhere(product: Product, others: Sequence[Product], use_member: bool) ->
     ]
 
 
-def _to_detail(session: Session, product: Product, use_member: bool) -> ProductDetail:
+def _to_detail(session: Session, product: Product, settings: Settings) -> ProductDetail:
+    use_member = settings.use_member_prices
     history = _history(product, use_member)
     others = _group(session, product)
     return ProductDetail(
-        **_to_out(product, use_member, others).model_dump(),
+        **_to_out(product, settings, others).model_dump(),
         history=[PricePointOut.model_validate(p, from_attributes=True) for p in product.prices],
         anomalies=[AnomalyOut(**vars(a)) for a in price_anomalies(history)],
         elsewhere=_elsewhere(product, others, use_member),
@@ -341,6 +350,11 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/api/app")
+    def app_info(settings: SettingsDep) -> AppInfo:
+        """How the app runs, for the header: the day PD_TODAY sets, if any."""
+        return AppInfo(set_date=settings.today)
 
     @app.get("/api/stores")
     def list_stores() -> list[StoreOut]:
@@ -396,11 +410,7 @@ def _register_routes(app: FastAPI) -> None:
             if p.group_key is not None:
                 groups.setdefault(p.group_key, []).append(p)
         outs = [
-            _to_out(
-                p,
-                settings.use_member_prices,
-                [o for o in groups.get(p.group_key or "", []) if o.id != p.id],
-            )
+            _to_out(p, settings, [o for o in groups.get(p.group_key or "", []) if o.id != p.id])
             for p in products
         ]
         return sorted(outs, key=lambda o: o.name.casefold())
@@ -431,11 +441,11 @@ def _register_routes(app: FastAPI) -> None:
             session.rollback()
             raise HTTPException(status.HTTP_409_CONFLICT, "This link is already tracked.") from exc
         session.refresh(product)
-        return _to_out(product, settings.use_member_prices)
+        return _to_out(product, settings)
 
     @app.get("/api/products/{product_id}")
     def get_product(product_id: int, session: SessionDep, settings: SettingsDep) -> ProductDetail:
-        return _to_detail(session, _get_product(session, product_id), settings.use_member_prices)
+        return _to_detail(session, _get_product(session, product_id), settings)
 
     @app.patch("/api/products/{product_id}")
     def update_product(
@@ -469,7 +479,7 @@ def _register_routes(app: FastAPI) -> None:
         if "name" in changes:
             update_size(product)
         session.commit()
-        return _to_out(product, settings.use_member_prices, _group(session, product))
+        return _to_out(product, settings, _group(session, product))
 
     @app.post("/api/products/{product_id}/link")
     def link_product(
@@ -491,7 +501,7 @@ def _register_routes(app: FastAPI) -> None:
         product.group_key, product.group_source = other.group_key, "user"
         product.display_name = None  # take the new group's name
         session.commit()
-        return _to_detail(session, product, settings.use_member_prices)
+        return _to_detail(session, product, settings)
 
     @app.delete("/api/products/{product_id}/link", status_code=status.HTTP_204_NO_CONTENT)
     def unlink_product(product_id: int, session: SessionDep) -> None:
@@ -550,7 +560,7 @@ def _register_routes(app: FastAPI) -> None:
 
         Without ``week``: the latest paper, this week's on a Sunday, last week's otherwise.
         """
-        today = date.today()
+        today = settings.current_date()
         latest = paper_week(today)
         monday = week_start(week) if week else latest
         if monday > latest:

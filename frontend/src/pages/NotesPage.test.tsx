@@ -44,7 +44,7 @@ const NOTES: Note[] = [
   note({ id: 5, kind: "target", old_price: 300, new_price: 249.9 }),
 ];
 
-function renderNotes(notes: Note[], path = "/notes") {
+function renderNotes(notes: Note[], path = "/notes", setDate: string | null = null) {
   const calls: { method: string; path: string }[] = [];
   vi.stubGlobal(
     "fetch",
@@ -56,7 +56,9 @@ function renderNotes(notes: Note[], path = "/notes") {
           ? { unread: notes.filter((n) => !n.read).length, notes }
           : p === "/products"
             ? []
-            : null;
+            : p === "/app"
+              ? { set_date: setDate }
+              : null;
       return data === null
         ? new Response(null, { status: 204 })
         : new Response(JSON.stringify(data), { headers: { "Content-Type": "application/json" } });
@@ -97,6 +99,17 @@ describe("notes", () => {
     const link = await screen.findByRole("link", { name: "Notes, 4 new" });
     expect(link).toHaveAttribute("href", "/notes");
     expect(link).toHaveAttribute("aria-current", "page");
+  });
+
+  it("says in the header when the app shows a set day, so a demo date isn't taken for today", async () => {
+    renderNotes(NOTES, "/notes", "2026-12-01");
+    expect(await screen.findByText("demo date: 1 Dec 2026")).toBeInTheDocument();
+  });
+
+  it("says nothing about the date on a normal day", async () => {
+    renderNotes(NOTES);
+    await screen.findByRole("link", { name: "Notes, 4 new" });
+    expect(screen.queryByText(/demo date/)).toBeNull();
   });
 
   it("shows just Notes when everything is read", async () => {

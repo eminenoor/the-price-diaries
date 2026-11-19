@@ -32,6 +32,7 @@ import {
   NOTE_LABELS,
   noteTone,
   unreadLabel,
+  demoDateLabel,
   type Point,
   windowState,
   type WindowKind,
@@ -516,6 +517,12 @@ describe("notes", () => {
     expect(unreadLabel(0)).toBe("");
     expect(unreadLabel(1)).toBe("1 new");
     expect(unreadLabel(12)).toBe("12 new");
+  });
+
+  it("names a set day in the header, and says nothing without one", () => {
+    expect(demoDateLabel("2026-12-01")).toBe("demo date: 1 Dec 2026");
+    expect(demoDateLabel(null)).toBe("");
+    expect(demoDateLabel(undefined)).toBe("");
   });
 });
 

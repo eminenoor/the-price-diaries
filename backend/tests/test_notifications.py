@@ -14,7 +14,7 @@ from price_diaries.analysis import (
     next_low_mark,
 )
 from price_diaries.db import Notification, PricePoint, Product
-from price_diaries.demo import DEMO_NOTES, seed_demo
+from price_diaries.demo import DEMO_TODAY
 from price_diaries.notifications import DesktopNotifications as RealDesktop
 from price_diaries.notifications import detect, lira, note_text
 from price_diaries.settings import Settings
@@ -358,14 +358,10 @@ def test_the_daily_check_notes_and_notifies(client, fake_pages, desktop, monkeyp
 # --- the demo ----------------------------------------------------------------------------------
 
 
-def test_demo_fills_the_inbox_without_desktop_notifications(client, desktop):
-    with client.app.state.db.session() as session:
-        seed_demo(session)
-    inbox = client.get("/api/notifications").json()
-    # Plus, in the Sunday paper's week, a cheaper find (read) and the paper itself (new).
-    assert len(inbox["notes"]) == len(DEMO_NOTES) + 2
-    assert inbox["unread"] == sum(not read for *_, read in DEMO_NOTES) + 1
-    assert {n["kind"] for n in inbox["notes"]} == {
+def test_demo_fills_the_inbox_without_desktop_notifications(demo_client, desktop):
+    inbox = demo_client.get("/api/notifications").json()
+    notes = inbox["notes"]
+    assert {n["kind"] for n in notes} == {
         "target",
         "lowest",
         "fake_sale",
@@ -373,11 +369,27 @@ def test_demo_fills_the_inbox_without_desktop_notifications(client, desktop):
         "back_in_stock",
         "sunday_paper",
     }
-    cheaper = next(n for n in inbox["notes"] if n["kind"] == "cheaper")
-    assert cheaper["other_store_name"] == "Watsons" and cheaper["new_price"] < cheaper["old_price"]
-    target = next(n for n in inbox["notes"] if n["kind"] == "target")
-    product = client.get(f"/api/products/{target['product_id']}").json()
-    assert product["summary"]["current"] <= product["target_price"]
+    # Read up to yesterday; today's notes and the latest Sunday paper are new.
+    unread = [n for n in notes if not n["read"]]
+    assert inbox["unread"] == len(unread) and 0 < len(unread) < 15
+    assert {n["created_at"][:10] for n in unread if n["kind"] != "sunday_paper"} == {
+        DEMO_TODAY.isoformat()
+    }
+    assert [n["week"] for n in unread if n["kind"] == "sunday_paper"] == ["2026-11-23"]
+    cheaper = next(n for n in notes if n["kind"] == "cheaper" and n["created_at"] > "2026-11-23")
+    assert cheaper["other_store_name"] == "Trendyol" and cheaper["new_price"] < cheaper["old_price"]
+
+    # They're the notes the app itself would have left: each at the price of that day's check.
+    for note in notes:
+        if note["kind"] in ("sunday_paper", "cheaper"):
+            continue
+        detail = demo_client.get(f"/api/products/{note['product_id']}").json()
+        check = next(
+            h for h in detail["history"] if h["checked_at"][:10] == note["created_at"][:10]
+        )
+        assert note["new_price"] == (check["member_price"] or check["price"]), note
+        if note["kind"] == "target":
+            assert note["new_price"] <= detail["target_price"]
     assert desktop.sent == []
 
 
