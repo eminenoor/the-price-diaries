@@ -56,3 +56,4 @@ ignore = ["S101"]  # assert is fine in tests
 
 [tool.ruff.lint.per-file-ignores]
 "src/price_diaries/demo.py" = ["S311"]  # non-crypto random is fine for demo data
+"tests/test_timing.py" = ["S311"]  # and for prices that move at random

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from price_diaries import migrate
 from price_diaries.analysis import (
+    Reading,
     cheaper_elsewhere,
     paper_week,
     pick_display_name,
@@ -38,6 +39,8 @@ from price_diaries.scheduler import build_scheduler
 from price_diaries.schemas import (
     AnomalyOut,
     AppInfo,
+    BacktestOut,
+    BestTimeOut,
     CategoryCreate,
     CategoryOut,
     CategoryUpdate,
@@ -53,13 +56,16 @@ from price_diaries.schemas import (
     ProductDetail,
     ProductOut,
     ProductUpdate,
+    SaleCycleOut,
     SizeOut,
     StoreOut,
     Summary,
     UnitPriceOut,
+    YearlyEventOut,
 )
 from price_diaries.security import UnsupportedURLError, validate_product_url
 from price_diaries.settings import Settings, get_settings
+from price_diaries.timing import best_time
 
 log = logging.getLogger(__name__)
 
@@ -302,6 +308,38 @@ def _to_detail(session: Session, product: Product, settings: Settings) -> Produc
         history=[PricePointOut.model_validate(p, from_attributes=True) for p in product.prices],
         anomalies=[AnomalyOut(**vars(a)) for a in price_anomalies(history)],
         elsewhere=_elsewhere(product, others, use_member),
+        best_time=_best_time(product, use_member, settings.current_date()),
+    )
+
+
+def _best_time(product: Product, use_member: bool, today: date) -> BestTimeOut:
+    readings = [
+        Reading(p.checked_at, p.effective_price(use_member), p.in_stock) for p in product.prices
+    ]
+    found = best_time(readings, today)
+    cycle = found.cycle
+    return BestTimeOut(
+        enough_history=found.enough_history,
+        days_of_month=found.days_of_month,
+        weekdays=found.weekdays,
+        sale_cycle=SaleCycleOut(
+            every_days=cycle.every_days,
+            typical_pct=round(cycle.depth * 100, 1),
+            last_days_ago=found.last_sale_days_ago or 0,
+        )
+        if cycle
+        else None,
+        events=[
+            YearlyEventOut(name=name, pct=round(share * 100, 1))
+            for name, share in found.events.items()
+        ],
+        backtest=BacktestOut(
+            trials=found.backtest.trials,
+            wins=found.backtest.wins,
+            average_saving_pct=round(found.backtest.average_saving * 100, 1),
+        )
+        if found.backtest
+        else None,
     )
 
 

@@ -128,11 +128,42 @@ export interface Anomaly {
   score: number;
 }
 
+/** Waiting for the shown times on past days: how often it paid less, and by how much. */
+export interface Backtest {
+  trials: number;
+  wins: number;
+  average_saving_pct: number;
+}
+
+export interface SaleCycle {
+  every_days: number;
+  typical_pct: number;
+  last_days_ago: number;
+}
+
+export interface YearlyEvent {
+  name: "11.11" | "Efsane Cuma";
+  /** Off the usual price, the last time. */
+  pct: number;
+}
+
+/** When this product has been cheapest. Only patterns that would have helped are given. */
+export interface BestTime {
+  enough_history: boolean;
+  days_of_month: number[];
+  /** Monday is 0. */
+  weekdays: number[];
+  sale_cycle: SaleCycle | null;
+  events: YearlyEvent[];
+  backtest: Backtest | null;
+}
+
 export interface ProductDetail extends Product {
   history: PricePoint[];
   anomalies: Anomaly[];
   /** The same product at other stores, cheapest first. */
   elsewhere: Offer[];
+  best_time: BestTime;
 }
 
 export interface CheckResult {

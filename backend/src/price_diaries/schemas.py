@@ -176,12 +176,44 @@ class OfferOut(BaseModel):
     )
 
 
+class BacktestOut(BaseModel):
+    """Waiting for the shown times on past days: how often it paid less, and by how much."""
+
+    trials: int
+    wins: int
+    average_saving_pct: float
+
+
+class SaleCycleOut(BaseModel):
+    every_days: int
+    typical_pct: float
+    last_days_ago: int
+
+
+class YearlyEventOut(BaseModel):
+    name: Literal["11.11", "Efsane Cuma"]
+    pct: float  # off the usual price, the last time
+
+
+class BestTimeOut(BaseModel):
+    """When this product has been cheapest. Only patterns that would have helped are given;
+    with none, the page says so."""
+
+    enough_history: bool
+    days_of_month: list[int] = Field(default_factory=list)
+    weekdays: list[int] = Field(default_factory=list, description="Monday is 0.")
+    sale_cycle: SaleCycleOut | None = None
+    events: list[YearlyEventOut] = Field(default_factory=list)
+    backtest: BacktestOut | None = None
+
+
 class ProductDetail(ProductOut):
     history: list[PricePointOut]
     anomalies: list[AnomalyOut]
     elsewhere: list[OfferOut] = Field(
         default_factory=list, description="The same product at other stores, cheapest first."
     )
+    best_time: BestTimeOut
 
 
 class LinkCreate(BaseModel):

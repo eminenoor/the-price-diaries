@@ -54,6 +54,14 @@ export const detail = (overrides: Partial<ProductDetail> = {}): ProductDetail =>
   ],
   anomalies: [],
   elsewhere: [],
+  best_time: {
+    enough_history: false,
+    days_of_month: [],
+    weekdays: [],
+    sale_cycle: null,
+    events: [],
+    backtest: null,
+  },
   ...overrides,
 });
 
@@ -137,6 +145,47 @@ describe("ProductPage chart", () => {
     renderProduct(detail());
     expect(await screen.findByRole("region", { name: "Price chart" })).toBeInTheDocument();
     expect(screen.queryByText("the chart starts after a few days of checks")).not.toBeInTheDocument();
+  });
+});
+
+describe("ProductPage best time to buy", () => {
+  const paydays = {
+    enough_history: true,
+    days_of_month: [1, 15],
+    weekdays: [],
+    sale_cycle: { every_days: 35, typical_pct: 15.2, last_days_ago: 21 },
+    events: [{ name: "Efsane Cuma" as const, pct: 18.4 }],
+    backtest: { trials: 103, wins: 86, average_saving_pct: 9.5 },
+  };
+
+  afterEach(() => localStorage.clear());
+
+  it("says when it has been cheapest, and how waiting would have done", async () => {
+    renderProduct(detail({ best_time: paydays }));
+    const section = await screen.findByRole("region", { name: "best time to buy" });
+    expect(section).toHaveTextContent(
+      "Has usually been cheapest around the 1st and 15th. Real sales have come every ~5 weeks, " +
+        "usually 15% off; the last one 3 weeks ago. Efsane Cuma was 18% off.",
+    );
+    expect(section).toHaveTextContent("Looking back, waiting for these times paid less on 86 of 103 days, 9.5% less on average.");
+    // Taped up at night, tilted by at most 3 degrees.
+    const note = section.querySelector<HTMLElement>(".best-time__note")!;
+    expect(Math.abs(parseFloat(note.style.getPropertyValue("--tilt")))).toBeLessThanOrEqual(3);
+  });
+
+  it("says when there isn't enough history yet, with no backtest", async () => {
+    renderProduct(detail());
+    const section = await screen.findByRole("region", { name: "best time to buy" });
+    expect(section).toHaveTextContent("Not enough history yet.");
+    expect(section).not.toHaveTextContent("Looking back");
+  });
+
+  it("is a plain note in quiet mode, with no tilt", async () => {
+    localStorage.setItem("price-diaries:mode", "quiet");
+    renderProduct(detail({ best_time: paydays }));
+    const section = await screen.findByRole("region", { name: "best time to buy" });
+    expect(section.querySelector<HTMLElement>(".best-time__note")!.style.getPropertyValue("--tilt")).toBe("");
+    expect(section).toHaveTextContent("Has usually been cheapest around the 1st and 15th.");
   });
 });
 

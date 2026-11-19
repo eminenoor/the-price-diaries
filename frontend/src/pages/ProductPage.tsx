@@ -2,6 +2,7 @@ import { lazy, Suspense, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import type { Size } from "../api";
+import { BestTimeNote } from "../components/BestTime";
 import { Elsewhere } from "../components/Elsewhere";
 import { LinerNotes } from "../components/LinerNotes";
 import { PencilCircle, PencilX } from "../components/Pencil";
@@ -129,6 +130,8 @@ export function ProductPage() {
       </div>
 
       <Elsewhere product={product} />
+
+      <BestTimeNote best={product.best_time} id={product.id} />
 
       {product.history.length === 1 ? (
         <p className="chart-note">the chart starts after a few days of checks</p>

@@ -78,6 +78,7 @@ class DemoProduct:
     gtin: str | None = None  # same barcode = same product at another store
     link: str | None = None  # linked by hand to others with the same link
     tracked_days: int | None = None  # added later than the rest
+    payday_dip: float | None = None  # always this share off around every payday
 
 
 TONER_GTIN = "08809598452350"
@@ -246,8 +247,15 @@ DEMO_PRODUCTS = [
     DemoProduct(
         "Vitamin C 1000 mg, 30 tablets", "eveshop", "Supplements", "Vitamins", 189.90, "up"
     ),
+    # Reliably cheaper around paydays, so the best time to buy has a pattern to show.
     DemoProduct(
-        "Magnesium Bisglycinate 120 caps", "watsons", "Supplements", "Minerals", 489.95, "deal"
+        "Magnesium Bisglycinate 120 caps",
+        "watsons",
+        "Supplements",
+        "Minerals",
+        489.95,
+        "deal",
+        payday_dip=0.08,
     ),
     DemoProduct("Zinc 25 mg, 100 tablets", "rossmann", "Supplements", "Minerals", 159.95, "steady"),
     DemoProduct("Omega-3 Fish Oil 60 caps", "amazon", "Supplements", "Fish oil", 429.99, "steady"),
@@ -389,7 +397,9 @@ def _natural(
             price = round(regular[i] * (1 - own_depth[sale]), 2)
         elif day.day in (1, 2, 15, 16):  # around payday, a small dip at some stores
             key = (day.year, day.month, day.day > 2)
-            if key not in paydays:
+            if key not in paydays and demo.payday_dip:
+                paydays[key] = demo.payday_dip
+            elif key not in paydays:
                 paydays[key] = rng.uniform(0.03, 0.06) if rng.random() < 0.3 else 0.0
             if paydays[key]:
                 price = round(regular[i] * (1 - paydays[key]), 2)

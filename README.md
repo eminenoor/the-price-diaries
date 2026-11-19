@@ -17,6 +17,7 @@ It runs on my own computer, and nothing is sent anywhere. The screenshots use de
 - Flags unusual price jumps using the modified z-score on daily price changes, so a product that changes price often needs a bigger jump
 - Tracks loyalty-card prices, like Gratis Özel Fiyat
 - Compares the same product across stores per ml or gram
+- Says when each product has usually been cheapest, from its own history, and only if waiting for that time would have paid off in the past
 - Leaves a note in the app and on the desktop when something changes
 - Puts each week on one printable page every Sunday: drops, new lows, fake sales, cheaper stores, price rises and failed checks
 

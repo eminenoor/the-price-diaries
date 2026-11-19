@@ -33,6 +33,9 @@ import {
   noteTone,
   unreadLabel,
   demoDateLabel,
+  backtestLine,
+  bestTimeNote,
+  ordinal,
   type Point,
   windowState,
   type WindowKind,
@@ -517,6 +520,52 @@ describe("notes", () => {
     expect(unreadLabel(0)).toBe("");
     expect(unreadLabel(1)).toBe("1 new");
     expect(unreadLabel(12)).toBe("12 new");
+  });
+
+  describe("best time to buy", () => {
+    const none = { enough_history: true, days_of_month: [], weekdays: [], sale_cycle: null, events: [], backtest: null };
+
+    it("says when there isn't enough history", () => {
+      expect(bestTimeNote({ ...none, enough_history: false })).toBe("Not enough history yet.");
+    });
+
+    it("says so when no pattern would have helped", () => {
+      expect(bestTimeNote(none)).toBe("No timing pattern has paid off for this one so far.");
+      expect(backtestLine(null)).toBe("");
+    });
+
+    it("writes each pattern that helped in plain words", () => {
+      expect(bestTimeNote({ ...none, weekdays: [0, 4] })).toBe("Has usually been cheapest on Mondays and Fridays.");
+      expect(
+        bestTimeNote({ ...none, sale_cycle: { every_days: 10, typical_pct: 12.6, last_days_ago: 1 } }),
+      ).toBe("Real sales have come every ~10 days, usually 13% off; the last one yesterday.");
+      expect(bestTimeNote({ ...none, events: [{ name: "11.11", pct: 8.2 }] })).toBe("11.11 was 8% off.");
+    });
+
+    it("tells what has been, never what will be", () => {
+      const every = {
+        ...none,
+        days_of_month: [1, 15],
+        weekdays: [2],
+        sale_cycle: { every_days: 32, typical_pct: 19, last_days_ago: 5 },
+        events: [
+          { name: "11.11" as const, pct: 10 },
+          { name: "Efsane Cuma" as const, pct: 24 },
+        ],
+        backtest: { trials: 1, wins: 1, average_saving_pct: 3 },
+      };
+      const words = `${bestTimeNote(every)} ${backtestLine(every.backtest)}`;
+      expect(words).not.toMatch(/\bwill\b/i);
+      expect(backtestLine(every.backtest)).toBe(
+        "Looking back, waiting for this time paid less on 1 of 1 days, 3.0% less on average.",
+      );
+    });
+  });
+
+  it("writes days of the month as ordinals", () => {
+    expect([1, 2, 3, 4, 11, 12, 13, 15, 21, 22, 23, 31].map(ordinal)).toEqual([
+      "1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "15th", "21st", "22nd", "23rd", "31st",
+    ]);
   });
 
   it("names a set day in the header, and says nothing without one", () => {

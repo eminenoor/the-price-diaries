@@ -3,7 +3,7 @@
  * where it hangs, which floor it belongs to and what the subtitle says.
  * No React here, so all of it is unit-tested in scene.test.ts.
  */
-import type { Category, NoteKind, Paper, PaperMove, Product, Summary } from "./api";
+import type { Backtest, BestTime, Category, NoteKind, Paper, PaperMove, Product, Summary } from "./api";
 import { formatChange, formatDate, formatPrice, parseDay, pickFeature } from "./format";
 
 // --- window state -------------------------------------------------------------
@@ -692,6 +692,62 @@ export function checkedLine(count: number): string {
 /** "down 12.0%" or "up 3.0%", in words. */
 export function moveWords(pct: number): string {
   return `${pct < 0 ? "down" : "up"} ${formatChange(pct).slice(1)}`;
+}
+
+// --- best time to buy -------------------------------------------------------------------
+
+/** 1 -> "1st", 2 -> "2nd", 11 -> "11th", 22 -> "22nd". */
+export function ordinal(n: number): string {
+  const teen = n % 100 >= 11 && n % 100 <= 13;
+  const suffix = teen ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+  return `${n}${suffix}`;
+}
+
+const WEEKDAY_NAMES = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
+
+function both(items: string[]): string {
+  return items.length > 1 ? `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}` : items[0];
+}
+
+/** "~5 weeks", or "~10 days" for gaps under two weeks. */
+function about(days: number): string {
+  return days >= 14 ? `~${Math.round(days / 7)} weeks` : `~${days} days`;
+}
+
+function ago(days: number): string {
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 14) return `${days} days ago`;
+  return `${Math.round(days / 7)} weeks ago`;
+}
+
+/**
+ * The handwritten note on when a product has been cheapest, from its own history. It says
+ * what has been, never what will be, and only patterns that would have helped come from the
+ * backend.
+ */
+export function bestTimeNote(best: BestTime): string {
+  if (!best.enough_history) return "Not enough history yet.";
+  const sentences: string[] = [];
+  if (best.days_of_month.length)
+    sentences.push(`Has usually been cheapest around the ${both(best.days_of_month.map(ordinal))}.`);
+  if (best.weekdays.length)
+    sentences.push(`Has usually been cheapest on ${both(best.weekdays.map((w) => WEEKDAY_NAMES[w]))}.`);
+  const cycle = best.sale_cycle;
+  if (cycle)
+    sentences.push(
+      `Real sales have come every ${about(cycle.every_days)}, usually ${Math.round(cycle.typical_pct)}% off; ` +
+        `the last one ${ago(cycle.last_days_ago)}.`,
+    );
+  for (const event of best.events) sentences.push(`${event.name} was ${Math.round(event.pct)}% off.`);
+  return sentences.length ? sentences.join(" ") : "No timing pattern has paid off for this one so far.";
+}
+
+/** The backtest in one line: "Looking back, waiting for these times paid less on 86 of 103 days, 9.5% less on average." */
+export function backtestLine(backtest: Backtest | null): string {
+  if (!backtest) return "";
+  const { wins, trials, average_saving_pct: saving } = backtest;
+  return `Looking back, waiting for ${trials === 1 ? "this time" : "these times"} paid less on ${wins} of ${trials} days, ${saving.toFixed(1)}% less on average.`;
 }
 
 const demoDay = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
