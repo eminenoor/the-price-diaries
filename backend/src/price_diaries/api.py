@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -18,7 +17,6 @@ from sqlalchemy.orm import Session
 
 from price_diaries import migrate
 from price_diaries.analysis import (
-    Reading,
     cheaper_elsewhere,
     paper_week,
     pick_display_name,
@@ -30,11 +28,18 @@ from price_diaries.analysis import (
     week_start,
 )
 from price_diaries.checker import check_all, check_product, update_size
-from price_diaries.db import Category, Database, Notification, Product
+from price_diaries.db import (
+    Category,
+    Database,
+    Notification,
+    Product,
+    group_by_key,
+    others_in_group,
+)
 from price_diaries.fetcher import Fetcher
 from price_diaries.notifications import Notifier, make_notifier, notify_after_check
 from price_diaries.paper import build_paper
-from price_diaries.parsers import STORES, Size, parse_size, with_size
+from price_diaries.parsers import STORES, Size, parse_size, store_name, with_size
 from price_diaries.scheduler import build_scheduler
 from price_diaries.schemas import (
     AnomalyOut,
@@ -43,7 +48,6 @@ from price_diaries.schemas import (
     BestTimeOut,
     CategoryCreate,
     CategoryOut,
-    CategoryUpdate,
     CheckResult,
     ElsewhereNote,
     LinkCreate,
@@ -83,9 +87,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "Unset PD_TODAY for daily use.",
                 f"{settings.today.day} {settings.today:%b %Y}",
             )
-        scheduler = None
-        if settings.scheduler_enabled:
-            scheduler = build_scheduler(db, settings, app.state.notifier)
+        notifier = app.state.notifier
+        scheduler = build_scheduler(db, settings, notifier) if settings.scheduler_enabled else None
         if scheduler:
             scheduler.start()
         yield
@@ -97,12 +100,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     # One notifier for the app's lifetime, so "not available" is logged only once.
     app.state.notifier = make_notifier(settings)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
     _register_routes(app)
     if settings.frontend_dir and Path(settings.frontend_dir, "index.html").exists():
         _serve_frontend(app, Path(settings.frontend_dir).resolve())
@@ -152,13 +149,6 @@ def _get_product(session: Session, product_id: int) -> Product:
 DEFAULT_FLOOR_COLOR = "#D9D2C3"
 
 
-def _get_category(session: Session, category_id: int) -> Category:
-    category = session.get(Category, category_id)
-    if category is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Floor or room not found.")
-    return category
-
-
 def _require_unique_name(session: Session, name: str, parent_id: int | None) -> None:
     siblings = session.scalars(
         select(Category.name).where(
@@ -186,14 +176,7 @@ def _require_category(session: Session, category_id: int | None) -> None:
 
 def _history(product: Product, use_member: bool) -> list[tuple]:
     """Price history using the price you would actually pay."""
-    return [(p.checked_at, p.effective_price(use_member)) for p in product.prices]
-
-
-_STORE_NAMES = {s.key: s.name for s in STORES}
-
-
-def _store_name(key: str) -> str:
-    return _STORE_NAMES.get(key, key)
+    return [(r.checked_at, r.price) for r in product.readings(use_member)]
 
 
 def _group(session: Session, product: Product) -> list[Product]:
@@ -226,7 +209,7 @@ def _cheaper_elsewhere(
         return None
     there = next(p for p in others if p.id == best[0].product_id)
     return ElsewhereNote(
-        product_id=there.id, store=there.store, store_name=_store_name(there.store), saving=best[1]
+        product_id=there.id, store=there.store, store_name=store_name(there.store), saving=best[1]
     )
 
 
@@ -238,7 +221,7 @@ def _display_name(product: Product, others: Sequence[Product]) -> str:
     # Stores in a group can sell different sizes: keep this one's own size in the name.
     size = None
     if product.size_amount is not None and product.size_unit is not None:
-        size = Size(product.size_amount, product.size_unit)  # type: ignore[arg-type]
+        size = Size(product.size_amount, product.size_unit)
     return with_size(name, size, product.name)
 
 
@@ -270,7 +253,6 @@ def _to_out(product: Product, settings: Settings, others: Sequence[Product] = ()
         created_at=product.created_at,
         summary=Summary(**vars(summary)) if summary else None,
         regular_price=latest.price if shows_member else None,
-        sparkline=[price for _, price in history[-30:]],
         size=size,
         unit_price=per_unit,
         gtin=product.gtin,
@@ -288,7 +270,7 @@ def _elsewhere(product: Product, others: Sequence[Product], use_member: bool) ->
             product_id=offer.product_id,
             name=by_id[offer.product_id].name,
             store=by_id[offer.product_id].store,
-            store_name=_store_name(by_id[offer.product_id].store),
+            store_name=store_name(by_id[offer.product_id].store),
             price=offer.price,
             unit_price=_unit_price_out(offer.price, by_id[offer.product_id]),
             checked_at=offer.checked_at,
@@ -305,7 +287,17 @@ def _to_detail(session: Session, product: Product, settings: Settings) -> Produc
     others = _group(session, product)
     return ProductDetail(
         **_to_out(product, settings, others).model_dump(),
-        history=[PricePointOut.model_validate(p, from_attributes=True) for p in product.prices],
+        # The card price only when it's the one you pay, so the chart matches the price above.
+        history=[
+            PricePointOut(
+                checked_at=p.checked_at,
+                price=p.price,
+                member_price=p.member_price if use_member else None,
+                currency=p.currency,
+                in_stock=p.in_stock,
+            )
+            for p in product.prices
+        ],
         anomalies=[AnomalyOut(**vars(a)) for a in price_anomalies(history)],
         elsewhere=_elsewhere(product, others, use_member),
         linked_ids=sorted(p.id for p in others),
@@ -314,10 +306,7 @@ def _to_detail(session: Session, product: Product, settings: Settings) -> Produc
 
 
 def _best_time(product: Product, use_member: bool, today: date) -> BestTimeOut:
-    readings = [
-        Reading(p.checked_at, p.effective_price(use_member), p.in_stock) for p in product.prices
-    ]
-    found = best_time(readings, today)
+    found = best_time(product.readings(use_member), today)
     cycle = found.cycle
     return BestTimeOut(
         enough_history=found.enough_history,
@@ -344,39 +333,29 @@ def _best_time(product: Product, use_member: bool, today: date) -> BestTimeOut:
     )
 
 
-def _note_out(note: Notification, products: dict[int, Product]) -> NoteOut:
+def _note_out(
+    note: Notification, products: dict[int, Product], groups: dict[str, list[Product]]
+) -> NoteOut:
     """A note, with the product's name as shown everywhere else (its group's name)."""
     product = products.get(note.product_id) if note.product_id is not None else None
     if product is None:  # the Sunday paper
         return NoteOut(
             id=note.id,
-            kind=note.kind,  # type: ignore[arg-type]
-            product_id=None,
-            product_name=None,
-            store=None,
-            store_name=None,
-            old_price=None,
-            new_price=None,
-            other_store_name=None,
+            kind=note.kind,
             week=note.week,
             created_at=note.created_at,
             read=note.read_at is not None,
         )
-    others = (
-        [p for p in products.values() if p.group_key == product.group_key and p.id != product.id]
-        if product.group_key
-        else []
-    )
     return NoteOut(
         id=note.id,
-        kind=note.kind,  # type: ignore[arg-type]
+        kind=note.kind,
         product_id=product.id,
-        product_name=_display_name(product, others),
+        product_name=_display_name(product, others_in_group(product, groups)),
         store=product.store,
-        store_name=_store_name(product.store),
+        store_name=store_name(product.store),
         old_price=note.old_price,
         new_price=note.new_price,
-        other_store_name=_store_name(note.other_store) if note.other_store else None,
+        other_store_name=store_name(note.other_store) if note.other_store else None,
         created_at=note.created_at,
         read=note.read_at is not None,
     )
@@ -386,10 +365,6 @@ def _note_out(note: Notification, products: dict[int, Product]) -> NoteOut:
 
 
 def _register_routes(app: FastAPI) -> None:
-    @app.get("/api/health")
-    def health() -> dict[str, str]:
-        return {"status": "ok"}
-
     @app.get("/api/app")
     def app_info(settings: SettingsDep) -> AppInfo:
         """How the app runs, for the header: the day PD_TODAY sets, if any."""
@@ -397,7 +372,7 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get("/api/stores")
     def list_stores() -> list[StoreOut]:
-        return [StoreOut(key=s.key, name=s.name, domains=list(s.domains)) for s in STORES]
+        return [StoreOut(key=s.key, name=s.name) for s in STORES]
 
     @app.get("/api/categories")
     def list_categories(session: SessionDep) -> list[CategoryOut]:
@@ -424,35 +399,12 @@ def _register_routes(app: FastAPI) -> None:
         session.commit()
         return _category_out(category)
 
-    @app.patch("/api/categories/{category_id}")
-    def update_category(category_id: int, body: CategoryUpdate, session: SessionDep) -> CategoryOut:
-        category = _get_category(session, category_id)
-        if body.name is not None and body.name.strip() != category.name:
-            _require_unique_name(session, body.name.strip(), category.parent_id)
-            category.name = body.name.strip()
-        if body.color is not None:
-            category.color = body.color.upper()
-        session.commit()
-        return _category_out(category)
-
-    @app.delete("/api/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-    def delete_category(category_id: int, session: SessionDep) -> None:
-        """Deleting a floor deletes its rooms. Products stay, without a category."""
-        session.delete(_get_category(session, category_id))
-        session.commit()
-
     @app.get("/api/products")
     def list_products(session: SessionDep, settings: SettingsDep) -> list[ProductOut]:
-        products = session.scalars(select(Product).order_by(Product.name)).all()
-        groups: dict[str, list[Product]] = {}
-        for p in products:
-            if p.group_key is not None:
-                groups.setdefault(p.group_key, []).append(p)
-        outs = [
-            _to_out(p, settings, [o for o in groups.get(p.group_key or "", []) if o.id != p.id])
-            for p in products
-        ]
-        return sorted(outs, key=lambda o: o.name.casefold())
+        products = session.scalars(select(Product)).all()
+        groups = group_by_key(products)
+        outs = [_to_out(p, settings, others_in_group(p, groups)) for p in products]
+        return sorted(outs, key=lambda o: (o.name.casefold(), o.id))
 
     @app.post("/api/products", status_code=status.HTTP_201_CREATED)
     def create_product(
@@ -470,7 +422,6 @@ def _register_routes(app: FastAPI) -> None:
             store=store.key,
             category_id=body.category_id,
             target_price=body.target_price,
-            selector=body.selector,
         )
         update_size(product)
         session.add(product)
@@ -588,9 +539,10 @@ def _register_routes(app: FastAPI) -> None:
             select(func.count()).select_from(Notification).where(Notification.read_at.is_(None))
         )
         products = {p.id: p for p in session.scalars(select(Product)).all()}
+        groups = group_by_key(products.values())
         return NotesOut(
             unread=unread or 0,
-            notes=[_note_out(n, products) for n in notes],
+            notes=[_note_out(n, products, groups) for n in notes],
         )
 
     @app.get("/api/paper")
@@ -604,15 +556,10 @@ def _register_routes(app: FastAPI) -> None:
         monday = week_start(week) if week else latest
         if monday > latest:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "That week's paper isn't out yet.")
-        products = session.scalars(select(Product)).all()
-        groups: dict[str, list[Product]] = {}
-        for p in products:
-            if p.group_key is not None:
-                groups.setdefault(p.group_key, []).append(p)
+        groups = group_by_key(session.scalars(select(Product)).all())
 
         def name_of(product: Product) -> str:
-            others = [o for o in groups.get(product.group_key or "", []) if o.id != product.id]
-            return _display_name(product, others)
+            return _display_name(product, others_in_group(product, groups))
 
         return build_paper(session, monday, settings.use_member_prices, today, name_of)
 

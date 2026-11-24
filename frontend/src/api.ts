@@ -8,7 +8,6 @@ export interface AppInfo {
 export interface Store {
   key: string;
   name: string;
-  domains: string[];
 }
 
 /** A floor (parent_id null, e.g. Skincare) or a room on a floor (e.g. Toners). */
@@ -102,7 +101,6 @@ export interface Product {
   summary: Summary | null;
   /** Latest shelf price, set only when the main price shown is a member price. */
   regular_price: number | null;
-  sparkline: number[];
   /** Pack size, or null if unknown. */
   size: Size | null;
   /** Null without a size or a price. */
@@ -287,7 +285,7 @@ export interface ProductChanges extends Partial<NewProduct> {
   display_name?: string;
 }
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
@@ -315,9 +313,6 @@ export const api = {
   categories: () => request<Category[]>("/categories"),
   createCategory: (body: NewCategory) =>
     request<Category>("/categories", { method: "POST", body: JSON.stringify(body) }),
-  updateCategory: (id: number, body: Partial<Pick<Category, "name" | "color">>) =>
-    request<Category>(`/categories/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
-  removeCategory: (id: number) => request<void>(`/categories/${id}`, { method: "DELETE" }),
   products: () => request<Product[]>("/products"),
   product: (id: number) => request<ProductDetail>(`/products/${id}`),
   create: (body: NewProduct) =>

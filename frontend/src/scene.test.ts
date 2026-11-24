@@ -21,7 +21,6 @@ import {
   SUBTITLE_MAX,
   pencilNotes,
   placement,
-  statsOf,
   timeAxis,
   boxesOverlap,
   layoutNotes,
@@ -74,7 +73,6 @@ const product = (overrides: Partial<Product> = {}): Product => ({
   gtin: null,
   listing_name: "Store name",
   cheaper_elsewhere: null,
-  sparkline: [],
   brand: null,
   ...overrides,
 });
@@ -193,19 +191,6 @@ describe("placement", () => {
   });
 });
 
-describe("statsOf", () => {
-  it("shows nothing that repeats the current price", () => {
-    const one = summary({ current: 250, previous: null, lowest: 250, highest: 250, lowest_30d: 250 });
-    expect(statsOf(one)).toEqual([]);
-  });
-
-  it("drops a stat that repeats another one", () => {
-    const labels = statsOf(summary({ current: 300, lowest: 250, highest: 360, lowest_30d: 250 })).map((s) => s.label);
-    expect(labels).toEqual(["Lowest", "Highest"]);
-    expect(statsOf(summary()).map((s) => s.label)).toEqual(["Lowest", "Highest", "Lowest in 30 days"]);
-  });
-});
-
 describe("pencilNotes", () => {
   const check = (day: number, price: number) => ({
     checked_at: new Date(2026, 10, day, 9, 17).toISOString(),
@@ -229,6 +214,17 @@ describe("pencilNotes", () => {
     const history = [check(1, 200), check(2, 300), check(3, 280), check(4, 300)];
     const s = summary({ current: 300, lowest: 200, highest: 300, lowest_30d: 280 });
     expect(pencilNotes(history, s, null).map((n) => n.kind)).toEqual(["lowest", "low30"]);
+  });
+
+  it("only writes the lowest when every number is the same", () => {
+    const s = summary({ current: 250, previous: null, lowest: 250, highest: 250, lowest_30d: 250 });
+    expect(pencilNotes([check(1, 250)], s, null).map((n) => n.kind)).toEqual(["lowest"]);
+  });
+
+  it("leaves out a 30-day low that repeats the highest", () => {
+    const history = [check(1, 200), check(2, 360), check(3, 300)];
+    const s = summary({ current: 300, lowest: 200, highest: 360, lowest_30d: 360 });
+    expect(pencilNotes(history, s, null).map((n) => n.kind)).toEqual(["lowest", "highest"]);
   });
 });
 

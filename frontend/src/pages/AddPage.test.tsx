@@ -20,7 +20,7 @@ function mockApi() {
     calls.push({ method, path, body });
     const json = (data: unknown, status = 200) =>
       new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
-    if (path === "/stores") return json([{ key: "gratis", name: "Gratis", domains: [] }]);
+    if (path === "/stores") return json([{ key: "gratis", name: "Gratis" }]);
     if (path === "/categories" && method === "GET") return json(CATEGORIES);
     if (path === "/categories" && method === "POST")
       return json({ id: 9, color: "#E8B4B8", parent_id: null, ...(body as object) }, 201);

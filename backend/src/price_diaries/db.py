@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from datetime import date, datetime
 from pathlib import Path
 
@@ -27,7 +27,7 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 
-from price_diaries.analysis import Offer
+from price_diaries.analysis import Offer, Reading
 
 
 class Base(DeclarativeBase):
@@ -66,7 +66,6 @@ class Product(Base):
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), index=True
     )
-    selector: Mapped[str | None] = mapped_column(String(300))
     target_price: Mapped[float | None] = mapped_column(Float)
     image_url: Mapped[str | None] = mapped_column(String(2048))  # from the store page
     last_error: Mapped[str | None] = mapped_column(String(500))
@@ -108,6 +107,29 @@ class Product(Base):
             size_amount=self.size_amount,
             size_unit=self.size_unit,
         )
+
+    def readings(self, use_member_prices: bool) -> list[Reading]:
+        """Every check, at the price you'd pay."""
+        return [
+            Reading(p.checked_at, p.effective_price(use_member_prices), p.in_stock)
+            for p in self.prices
+        ]
+
+
+def group_by_key(products: Iterable[Product]) -> dict[str, list[Product]]:
+    """Grouped products (the same product at several stores) by their group_key."""
+    groups: dict[str, list[Product]] = {}
+    for product in products:
+        if product.group_key is not None:
+            groups.setdefault(product.group_key, []).append(product)
+    return groups
+
+
+def others_in_group(product: Product, groups: dict[str, list[Product]]) -> list[Product]:
+    """The same product at other stores, from ``group_by_key``."""
+    if product.group_key is None:
+        return []
+    return [p for p in groups.get(product.group_key, []) if p.id != product.id]
 
 
 class PricePoint(Base):

@@ -69,30 +69,6 @@ export function lighting(kind: WindowKind): Lighting {
   return { light: "dark", curtains: "closed", blinds: kind === "blocked" };
 }
 
-// --- stats --------------------------------------------------------------------------
-
-export interface Stat {
-  label: string;
-  value: number;
-  /** ISO date the price was seen, when it matters. */
-  at?: string;
-}
-
-/**
- * Lowest, highest and lowest in 30 days, leaving out any that would only
- * repeat a number already on the page (the current price, or another stat).
- * With one check they are all the current price, so none are shown.
- */
-export function statsOf(s: Summary): Stat[] {
-  const candidates: Stat[] = [
-    { label: "Lowest", value: s.lowest, at: s.lowest_at },
-    { label: "Highest", value: s.highest, at: s.highest_at },
-    { label: "Lowest in 30 days", value: s.lowest_30d },
-  ];
-  const shown = new Set([s.current]);
-  return candidates.filter((stat) => !shown.has(stat.value) && shown.add(stat.value));
-}
-
 // --- pencil notes on the chart ------------------------------------------------------
 
 export interface PencilNote {
@@ -126,13 +102,16 @@ export function pencilNotes(
     ...low,
   });
 
-  const shown = statsOf(summary).map((s) => s.label);
+  // The highest and the 30-day low only when they are new numbers, not the current
+  // price, the lowest or each other.
+  const seen = [summary.current, summary.lowest, low.price];
   const high = latest(summary.highest);
-  if (high && summary.highest !== low.price && shown.includes("Highest"))
+  if (high && !seen.includes(summary.highest))
     notes.push({ kind: "highest", text: `highest ₺${formatPrice(high.price)}`, ...high });
+  seen.push(summary.highest);
 
   const low30 = latest(summary.lowest_30d);
-  if (low30 && summary.lowest_30d !== low.price && shown.includes("Lowest in 30 days"))
+  if (low30 && !seen.includes(summary.lowest_30d))
     notes.push({ kind: "low30", text: `30-day low ₺${formatPrice(low30.price)}`, ...low30 });
 
   if (target !== null)
@@ -635,8 +614,8 @@ export function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-export const INK = "#141414";
-export const WHITE = "#FFFFFF";
+const INK = "#141414";
+const WHITE = "#FFFFFF";
 
 /** Text colour for a label printed on a user-chosen floor colour. */
 export function inkOn(background: string): string {

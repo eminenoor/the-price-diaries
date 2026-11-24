@@ -7,7 +7,7 @@ import { Price } from "./Price";
 const FIRST_LOOK = 24;
 
 /** "A1", "A2" … for the first half of the checks, "B1" … for the second. */
-export function trackNumber(index: number, total: number): string {
+function trackNumber(index: number, total: number): string {
   const side = Math.ceil(total / 2);
   return index < side ? `A${index + 1}` : `B${index - side + 1}`;
 }

@@ -64,12 +64,10 @@ class Fetcher:
         min_delay: float = 3.0,
         max_delay: float = 7.0,
         timeout: float = 20.0,
-        respect_robots: bool = True,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self.min_delay, self.max_delay = min_delay, max_delay
         self.timeout = timeout
-        self.respect_robots = respect_robots
         self._client = client or httpx.AsyncClient(
             headers=HEADERS, timeout=timeout, follow_redirects=True
         )
@@ -85,7 +83,7 @@ class Fetcher:
 
     async def get(self, url: str) -> str:
         host = urlsplit(url).hostname or ""
-        if self.respect_robots and not await self._allowed(url):
+        if not await self._allowed(url):
             raise FetchError("robots.txt asks bots not to fetch this page.")
 
         async with self._host_locks[host]:

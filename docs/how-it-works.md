@@ -23,7 +23,6 @@ When a store refuses a check, the product shows "Last check failed" with the rea
 
 - Sephora blocks both plain page downloads and the browser, so its prices can't be tracked
 - Watsons blocks the browser, but plain page downloads work, so regular prices are tracked
-- Eve Shop answered "too many requests" (429) during testing; try again later
 
 ## Security and responsible scraping
 

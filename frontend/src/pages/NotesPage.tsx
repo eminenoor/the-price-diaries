@@ -92,7 +92,7 @@ function NoteItem({ note }: { note: Note }) {
 }
 
 /** The note in one plain sentence, the same one the desktop notification shows. */
-export function NoteSentence({ note }: { note: Note }) {
+function NoteSentence({ note }: { note: Note }) {
   if (note.kind === "sunday_paper") {
     const week = note.week ?? "";
     return (

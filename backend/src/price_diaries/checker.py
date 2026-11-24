@@ -40,7 +40,7 @@ async def fetch_price(product: Product, source: PageSource, browser_fallback: bo
 
     if not store.needs_browser:
         try:
-            parsed = parser.parse(await source.get(product.url), selector=product.selector)
+            parsed = parser.parse(await source.get(product.url))
         except PriceNotFoundError:
             if not browser_fallback:
                 raise
@@ -50,16 +50,14 @@ async def fetch_price(product: Product, source: PageSource, browser_fallback: bo
                 return parsed
             # Member prices are often added by JavaScript after the page loads.
             try:
-                rendered = parser.parse(
-                    await source.get_rendered(product.url), selector=product.selector
-                )
+                rendered = parser.parse(await source.get_rendered(product.url))
             except (FetchError, PriceNotFoundError) as exc:
                 log.info("%s: kept regular price, member price unavailable: %s", product.name, exc)
                 return parsed
             return rendered if rendered.member_price is not None else parsed
 
     html = await source.get_rendered(product.url)
-    return parser.parse(html, selector=product.selector)
+    return parser.parse(html)
 
 
 def update_size(product: Product, page_size: Size | None = None) -> None:

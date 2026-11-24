@@ -16,9 +16,10 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from price_diaries.analysis import Reading, paper_week, week_story
+from price_diaries.analysis import paper_week, week_story
 from price_diaries.db import CheckFailure, Notification, PricePoint, Product
-from price_diaries.notifications import Notifier, store_name
+from price_diaries.notifications import Notifier
+from price_diaries.parsers import store_name
 from price_diaries.schemas import (
     PaperCheaper,
     PaperFakeSale,
@@ -80,11 +81,7 @@ def build_paper(
     stock: dict[int, datetime] = {}
     checked = 0
     for product in products:
-        readings = [
-            Reading(p.checked_at, p.effective_price(use_member), p.in_stock)
-            for p in product.prices
-            if p.checked_at < end
-        ]
+        readings = [r for r in product.readings(use_member) if r.checked_at < end]
         story = week_story(readings, monday)
         checked += story.checked
         if story.move:

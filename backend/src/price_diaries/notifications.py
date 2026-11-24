@@ -17,31 +17,25 @@ from sqlalchemy.orm import Session
 
 from price_diaries.analysis import (
     AlertKind,
-    Reading,
     alert_signals,
     cheaper_elsewhere,
     fresh_alerts,
     next_low_mark,
 )
-from price_diaries.db import AlertState, Notification, Product
-from price_diaries.parsers import STORES
+from price_diaries.db import AlertState, Notification, Product, group_by_key, others_in_group
+from price_diaries.parsers import store_name
 from price_diaries.settings import Settings
 
 log = logging.getLogger(__name__)
 
 APP_NAME = "The Price Diaries"
-_STORE_NAMES = {s.key: s.name for s in STORES}
-
-
-def store_name(key: str) -> str:
-    return _STORE_NAMES.get(key, key)
 
 
 # --- what to note ----------------------------------------------------------------------
 
 
 def _cheaper(
-    product: Product, group: Sequence[Product], use_member: bool, today: date
+    product: Product, others: Sequence[Product], use_member: bool, today: date
 ) -> tuple[str, float] | None:
     """The store that sells it for less today, and its price for this product's size.
 
@@ -53,14 +47,14 @@ def _cheaper(
         return None
     offers = [
         offer
-        for other in group
-        if other.id != product.id and len(other.prices) > 1
+        for other in others
+        if len(other.prices) > 1
         if (offer := other.offer(use_member)) is not None
     ]
     best = cheaper_elsewhere(here, offers, today)
     if best is None:
         return None
-    there = next(p for p in group if p.id == best[0].product_id)
+    there = next(p for p in others if p.id == best[0].product_id)
     price_there = float(Decimal(str(here.price)) - Decimal(str(best[1])))
     return there.store, price_there
 
@@ -78,20 +72,17 @@ def detect(
         (s.product_id, s.kind): s
         for s in session.scalars(select(AlertState).where(AlertState.product_id.in_(ids)))
     }
-    groups: dict[str, list[Product]] = {}
     keys = {p.group_key for p in products if p.group_key}
-    if keys:
-        for member in session.scalars(select(Product).where(Product.group_key.in_(keys))):
-            groups.setdefault(member.group_key or "", []).append(member)
+    groups = group_by_key(
+        session.scalars(select(Product).where(Product.group_key.in_(keys))) if keys else []
+    )
 
     notes: list[Notification] = []
     for product in products:
         if not product.prices:
             continue
-        readings = [
-            Reading(p.checked_at, p.effective_price(use_member), p.in_stock) for p in product.prices
-        ]
-        cheaper = _cheaper(product, groups.get(product.group_key or "", []), use_member, today)
+        readings = product.readings(use_member)
+        cheaper = _cheaper(product, others_in_group(product, groups), use_member, today)
         lowest = states.get((product.id, "lowest"))
         low_mark = lowest.price if lowest else None
         signals = alert_signals(readings, product.target_price, cheaper, low_mark)

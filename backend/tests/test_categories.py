@@ -61,23 +61,6 @@ def test_bad_colour_is_rejected(client):
     assert add_room(client, color="red").status_code == 422
 
 
-def test_rename_and_recolour(client):
-    room = add_room(client).json()
-    renamed = client.patch(
-        f"/api/categories/{room['id']}", json={"name": "Tonics", "color": "#112233"}
-    )
-    assert renamed.status_code == 200
-    assert (renamed.json()["name"], renamed.json()["color"]) == ("Tonics", "#112233")
-    assert client.patch("/api/categories/999", json={"name": "X"}).status_code == 404
-
-
-def test_rename_to_a_sibling_name_is_rejected(client):
-    add_room(client, "Toners")
-    serums = add_room(client, "Serums").json()
-    clash = client.patch(f"/api/categories/{serums['id']}", json={"name": "Toners"})
-    assert clash.status_code == 409
-
-
 def test_product_in_a_room(client):
     room = add_room(client).json()
     product = client.post(
@@ -90,18 +73,3 @@ def test_product_in_a_room(client):
 def test_product_with_unknown_category_is_rejected(client):
     body = {"url": URL, "name": "Toner", "category_id": 999}
     assert client.post("/api/products", json=body).status_code == 422
-
-
-def test_deleting_a_floor_deletes_rooms_but_keeps_products(client):
-    room = add_room(client).json()
-    product = client.post(
-        "/api/products", json={"url": URL, "name": "Toner", "category_id": room["id"]}
-    ).json()
-
-    assert client.delete(f"/api/categories/{floor_id(client)}").status_code == 204
-
-    names = [c["name"] for c in client.get("/api/categories").json()]
-    assert "Skincare" not in names and "Toners" not in names
-    kept = client.get(f"/api/products/{product['id']}")
-    assert kept.status_code == 200
-    assert kept.json()["category_id"] is None

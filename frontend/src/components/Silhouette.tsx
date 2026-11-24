@@ -15,7 +15,7 @@ const RULES: [RegExp, Shape][] = [
   [/vitamin|magnesium|zinc|omega|caps|supplement|mineral/i, "pills"],
 ];
 
-export function shapeFor(text: string): Shape {
+function shapeFor(text: string): Shape {
   return RULES.find(([pattern]) => pattern.test(text))?.[1] ?? "bottle";
 }
 

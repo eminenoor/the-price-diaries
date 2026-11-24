@@ -28,7 +28,6 @@ const base = {
   gtin: null,
   listing_name: "Store name",
   cheaper_elsewhere: null,
-  sparkline: [],
   brand: null,
 };
 const summary = {
@@ -71,9 +70,9 @@ function mockApi(products: Product[]) {
           : path === "/categories"
             ? CATEGORIES
             : [
-                { key: "gratis", name: "Gratis", domains: [] },
-                { key: "sephora", name: "Sephora", domains: [] },
-                { key: "amazon", name: "Amazon", domains: [] },
+                { key: "gratis", name: "Gratis" },
+                { key: "sephora", name: "Sephora" },
+                { key: "amazon", name: "Amazon" },
               ];
       return new Response(JSON.stringify(data), { headers: { "Content-Type": "application/json" } });
     }),

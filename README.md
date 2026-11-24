@@ -21,8 +21,6 @@ It runs on my own computer, and nothing is sent anywhere. The screenshots use de
 - Leaves a note in the app and on the desktop when something changes
 - Puts each week on one printable page every Sunday: drops, new lows, fake sales, cheaper stores, price rises and failed checks
 
-Sephora blocks automated checks, and the app doesn't try to get around that.
-
 ## How it works
 
 ```mermaid
@@ -59,6 +57,8 @@ To try it with demo data first, run `uv run price-diaries demo` and then `uv run
 
 More commands and settings are in [docs/usage.md](docs/usage.md).
 
-Built with Python (FastAPI, SQLAlchemy, Playwright) and React with TypeScript.
-
 MIT license
+
+Not affiliated with any of these stores. Store names are only used to say which sites it works with.
+
+For personal use. Check each store's terms of use before running it.

@@ -28,7 +28,6 @@ class Settings(BaseSettings):
     desktop_notifications: bool = True
     # Built frontend (npm run build). Served at / when it exists.
     frontend_dir: str | None = "../frontend/dist"
-    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
     # Show the app as it looks on this day: which prices count as "checked today" and which
     # Sunday paper is the latest. For the demo data (PD_TODAY=2026-12-01); leave it unset
     # for daily use. Checks still record the real time.

@@ -25,6 +25,7 @@ price-diaries = "price_diaries.cli:main"
 
 [dependency-groups]
 dev = [
+    # Starlette's TestClient (used by the API tests) prefers it over httpx.
     "httpx2>=2.16.0",
     "pytest>=8.0",
     "pytest-asyncio>=0.24",

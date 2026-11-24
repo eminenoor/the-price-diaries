@@ -6,11 +6,20 @@ from price_diaries.fetcher import Fetcher, FetchError, StoreBlockedError, _check
 URL = "https://www.sephora.com.tr/p/demo-tonik-P1.html"
 
 
-async def _get(status: int) -> str:
-    transport = httpx.MockTransport(lambda _: httpx.Response(status, text=""))
-    client = httpx.AsyncClient(transport=transport)
-    async with Fetcher(min_delay=0, max_delay=0, respect_robots=False, client=client) as fetcher:
+async def _get(status: int, robots: str = "User-agent: *\nAllow: /\n") -> str:
+    def answer(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text=robots)
+        return httpx.Response(status, text="")
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(answer))
+    async with Fetcher(min_delay=0, max_delay=0, client=client) as fetcher:
         return await fetcher.get(URL)
+
+
+async def test_robots_txt_is_respected():
+    with pytest.raises(FetchError, match="robots.txt asks bots not to fetch this page"):
+        await _get(200, robots="User-agent: *\nDisallow: /p/\n")
 
 
 async def test_forbidden_says_store_blocks_checks():

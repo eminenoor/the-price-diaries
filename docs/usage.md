@@ -1,32 +1,23 @@
 # Usage
 
+Installing, starting the app and the demo are in the README under "Run it".
+
 ## Commands
 
 Run these from `backend/`.
 
-- `uv run price-diaries serve`: runs the API, the daily check and the built UI on http://127.0.0.1:8000
-- `uv run price-diaries serve --demo`: shows the demo database instead, as it looks on 1 December 2026, with no daily check
 - `uv run price-diaries check`: checks every product once, now
 - `uv run price-diaries migrate`: creates or updates the database
-- `uv run price-diaries demo`: adds 36 demo products with half a year of made-up history, as they are on 1 December 2026, just after Efsane Cuma. They go into their own database (`data/demo.db`), never your real one. Run it once; to start over, delete `data/demo.db`
 - `uv run price-diaries notify test`: sends one test desktop notification
 - `uv run price-diaries inspect <url>`: shows what each parsing strategy finds on a product page (`--browser` to render JavaScript, `--save page.html` to keep the HTML)
-- `uv run pytest`: backend tests
-- `npm test` (from `frontend/`): frontend tests
-- `npm run build` (from `frontend/`): builds the UI that `serve` shows
+
+The demo has 36 products with half a year of made-up history, as they are on 1 December 2026, just after Efsane Cuma. Run `demo` once; to start over, delete `data/demo.db`.
+
+To use the app without the dev server, run `npm run build` in `frontend/`. Then `serve` shows the UI on http://127.0.0.1:8000.
 
 ## Settings
 
-Copy `backend/.env.example` to `backend/.env`. All settings are optional.
-
-- `PD_DATABASE_URL`: database location (default `sqlite:///./data/prices.db`)
-- `PD_DEMO_DATABASE_URL`: the demo's database (default `sqlite:///./data/demo.db`). It must be a different file from `PD_DATABASE_URL`
-- `PD_CHECK_HOUR`, `PD_CHECK_MINUTE`: daily check time (default 09:17)
-- `PD_MIN_DELAY`, `PD_MAX_DELAY`: seconds between two pages of the same store (default 3 to 7)
-- `PD_BROWSER_FALLBACK`: use a headless browser when the price isn't in the page HTML (default `true`)
-- `PD_USE_MEMBER_PRICES`: track the loyalty-card price when a store shows one (default `true`)
-- `PD_DESKTOP_NOTIFICATIONS`: show notes as desktop notifications (default `true`)
-- `PD_TODAY`: show the app as it looks on this day, such as `2026-12-01` for the demo data (default: the real date). `serve --demo` sets it for you. While it's set, the app logs a warning at startup and the header says "demo date: 1 Dec 2026"
+Copy `backend/.env.example` to `backend/.env`. Every setting is described in that file, and all of them are optional.
 
 ## Notifications
 
@@ -44,7 +35,7 @@ Each note is sent once. A product's first check never sends one.
 ## Adding a store
 
 - Add one `Store(...)` entry in `backend/src/price_diaries/parsers/sites.py`: name, domains, and when needed price selectors, whether it needs a browser, and the loyalty-card price labels
-- Run `uv run price-diaries inspect <url>` on a product page to see what each parsing strategy finds
+- Run `inspect` (above) on a product page to see what each parsing strategy finds
 - Add tests in `backend/tests/test_parsers.py`
 
 ## Development
@@ -54,10 +45,10 @@ Setup:
 ```bash
 cd backend && uv sync && cd ..
 cd frontend && npm install && cd ..
-uvx pre-commit install --hook-type pre-commit --hook-type commit-msg
+uvx pre-commit install
 ```
 
-The pre-commit hooks format Python code and check commit messages.
+The pre-commit hooks lint and format the Python code and check commit messages.
 
 Tests and lint, before opening a pull request:
 

@@ -39,12 +39,6 @@ def test_meta_tags():
     assert (result.price, result.source) == (1299.90, "meta")
 
 
-def test_custom_selector_wins():
-    html = '<span class="old">500 TL</span><span id="now">399,90 TL</span>'
-    result = Parser().parse(html, selector="#now")
-    assert (result.price, result.source) == (399.90, "custom-selector")
-
-
 def test_out_of_stock_detected():
     assert Parser().parse(OUT_OF_STOCK_PAGE).in_stock is False
 

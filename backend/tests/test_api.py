@@ -20,10 +20,6 @@ def add_product(client, **overrides):
     return client.post("/api/products", json=body)
 
 
-def test_health(client):
-    assert client.get("/api/health").json() == {"status": "ok"}
-
-
 def test_lists_supported_stores(client):
     keys = {s["key"] for s in client.get("/api/stores").json()}
     assert {"gratis", "trendyol", "amazon", "sephora"} <= keys
@@ -43,7 +39,6 @@ def test_create_and_check_product(client, fake_pages):
     detail = client.get(f"/api/products/{product_id}").json()
     assert detail["summary"]["current"] == 289.9
     assert len(detail["history"]) == 1
-    assert detail["sparkline"] == [289.9]
 
 
 def test_failed_check_records_error(client):
@@ -97,7 +92,7 @@ def test_serves_built_frontend(settings, fake_pages, tmp_path):
         assert client.get("/assets/app.js").text == "console.log(1)"
         assert "root" in client.get("/products/3").text  # SPA route
         assert "nope" not in client.get("/..%2Fsecret.txt").text  # path traversal
-        assert client.get("/api/health").json() == {"status": "ok"}
+        assert client.get("/api/stores").json()[0] == {"key": "gratis", "name": "Gratis"}
 
 
 MEMBER_PAGE = PAGE + "<div><p>Gold&amp;Platinum Özel Fiyat</p><p>149,90 TL</p></div>"
@@ -140,6 +135,8 @@ def test_regular_price_when_member_prices_off(settings, fake_pages):
         detail = client.get(f"/api/products/{product_id}").json()
     assert detail["summary"]["current"] == 289.9
     assert detail["regular_price"] is None
+    # The chart and its notes read the history: no card price there either.
+    assert [(p["price"], p["member_price"]) for p in detail["history"]] == [(289.9, None)]
 
 
 def test_check_stores_product_photo(client, fake_pages):

@@ -88,5 +88,13 @@ STORES: tuple[Store, ...] = (
 _BY_DOMAIN = {domain: store for store in STORES for domain in store.domains}
 
 
+_NAMES = {store.key: store.name for store in STORES}
+
+
 def store_for_host(host: str) -> Store | None:
     return _BY_DOMAIN.get(host.lower())
+
+
+def store_name(key: str) -> str:
+    """ "Gratis" for "gratis"; the key itself for a store that's no longer listed."""
+    return _NAMES.get(key, key)

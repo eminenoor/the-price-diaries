@@ -46,7 +46,6 @@ export const detail = (overrides: Partial<ProductDetail> = {}): ProductDetail =>
   gtin: null,
   listing_name: "Store name",
   cheaper_elsewhere: null,
-  sparkline: [],
   history: [
     point("2026-11-05T09:17:00", 320),
     point("2026-11-08T09:17:00", 300),
@@ -77,7 +76,7 @@ export function renderProduct(product: ProductDetail, others: Product[] = [], ca
       calls.push({ method, path, body });
       const data =
         path === "/stores"
-          ? [{ key: "gratis", name: "Gratis", domains: [] }]
+          ? [{ key: "gratis", name: "Gratis" }]
           : path === "/categories"
             ? categories
             : path === "/products"

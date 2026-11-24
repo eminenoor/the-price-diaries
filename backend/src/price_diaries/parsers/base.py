@@ -32,7 +32,7 @@ class PriceNotFoundError(LookupError):
 
 
 class Parser:
-    """Finds a price in HTML: custom selector, then JSON-LD, meta tags, store selectors.
+    """Finds a price in HTML: JSON-LD, then meta tags, then the store's CSS selectors.
 
     ``member_labels`` are regular expressions for the text a store prints next to
     its loyalty-card price (Gratis: "Gold&Platinum Özel Fiyat"). Matching on that
@@ -45,9 +45,9 @@ class Parser:
         self.extra_selectors = extra_selectors
         self.member_labels = member_labels
 
-    def parse(self, html: str, selector: str | None = None) -> ParsedPrice:
+    def parse(self, html: str) -> ParsedPrice:
         soup = BeautifulSoup(html, "html.parser")
-        for _, strategy in self._strategies(soup, selector):
+        for _, strategy in self._strategies(soup):
             result = strategy()
             if result is not None:
                 member = _member_price(soup, self.member_labels)
@@ -60,21 +60,19 @@ class Parser:
                     size=_size(soup),
                     gtin=_gtin(soup),
                 )
-        raise PriceNotFoundError("No price found on page. Try adding a 'selector' for it.")
+        raise PriceNotFoundError("No price found on the page.")
 
-    def explain(self, html: str, selector: str | None = None) -> dict[str, float | None]:
+    def explain(self, html: str) -> dict[str, float | None]:
         """What every strategy finds on the page. Used by `price-diaries inspect`."""
         soup = BeautifulSoup(html, "html.parser")
         found = {}
-        for name, strategy in self._strategies(soup, selector):
+        for name, strategy in self._strategies(soup):
             result = strategy()
             found[name] = result.price if result else None
         found["member price"] = _member_price(soup, self.member_labels)
         return found
 
-    def _strategies(self, soup: BeautifulSoup, selector: str | None):
-        if selector:
-            yield "custom selector", lambda: _from_selectors(soup, (selector,), "custom-selector")
+    def _strategies(self, soup: BeautifulSoup):
         yield "json-ld", lambda: _from_json_ld(soup)
         yield "meta tags", lambda: _from_meta(soup)
         yield (

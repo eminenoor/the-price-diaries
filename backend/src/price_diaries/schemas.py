@@ -16,7 +16,6 @@ class AppInfo(BaseModel):
 class StoreOut(BaseModel):
     key: str
     name: str
-    domains: list[str]
 
 
 HEX_COLOR = r"^#[0-9A-Fa-f]{6}$"
@@ -37,17 +36,11 @@ class CategoryCreate(BaseModel):
     )
 
 
-class CategoryUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=50)
-    color: str | None = Field(default=None, pattern=HEX_COLOR)
-
-
 class ProductCreate(BaseModel):
     url: str = Field(max_length=2048, examples=["https://www.gratis.com/urun-p-12345"])
     name: str = Field(min_length=1, max_length=200)
     category_id: int | None = Field(default=None, description="A room or a floor.")
     target_price: float | None = Field(default=None, gt=0)
-    selector: str | None = Field(default=None, max_length=300)
 
 
 class ProductUpdate(BaseModel):
@@ -65,7 +58,6 @@ class ProductUpdate(BaseModel):
     )
     category_id: int | None = None
     target_price: float | None = Field(default=None, gt=0)
-    selector: str | None = Field(default=None, max_length=300)
     size: str | None = Field(
         default=None,
         max_length=50,
@@ -133,7 +125,6 @@ class ProductOut(BaseModel):
     regular_price: float | None = Field(
         default=None, description="Latest shelf price, when a member price is shown instead."
     )
-    sparkline: list[float] = Field(description="Up to the last 30 prices, oldest first.")
     size: SizeOut | None = Field(default=None, description="Pack size, if known.")
     unit_price: UnitPriceOut | None = Field(
         default=None, description="Current price (the card price when shown) per unit of size."
@@ -232,17 +223,20 @@ class NoteOut(BaseModel):
 
     id: int
     kind: NoteKind
-    product_id: int | None
-    product_name: str | None
-    store: str | None
-    store_name: str | None
+    product_id: int | None = None
+    product_name: str | None = None
+    store: str | None = None
+    store_name: str | None = None
     old_price: float | None = Field(
-        description="The price at the check before; for cheaper, the price here."
+        default=None, description="The price at the check before; for cheaper, the price here."
     )
     new_price: float | None = Field(
-        description="The new price; for cheaper, the other store's price for this size."
+        default=None,
+        description="The new price; for cheaper, the other store's price for this size.",
     )
-    other_store_name: str | None = Field(description="For cheaper: the store that sells it.")
+    other_store_name: str | None = Field(
+        default=None, description="For cheaper: the store that sells it."
+    )
     week: date | None = Field(
         default=None, description="For sunday_paper: the Monday of the week it's about."
     )

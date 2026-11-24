@@ -60,7 +60,6 @@ const product = (overrides: Partial<Product> = {}): Product => ({
   gtin: null,
   listing_name: "Store name",
   cheaper_elsewhere: null,
-  sparkline: [],
   brand: null,
   ...overrides,
 });
