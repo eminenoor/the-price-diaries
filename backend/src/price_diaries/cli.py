@@ -161,7 +161,7 @@ async def _notify_test(enabled: bool) -> int:
         print("Desktop notifications are off. Set PD_DESKTOP_NOTIFICATIONS=true to turn them on.")
         return 1
     sent = await notifications.DesktopNotifications().send(
-        "Test notification", "Notes about your prices will appear like this."
+        notifications.APP_NAME, "Notifications are working. You'll see price news here."
     )
     if not sent:
         print("Couldn't show a desktop notification. The log above says why.")

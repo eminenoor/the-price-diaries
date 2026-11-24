@@ -2,7 +2,8 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
 import type { ElsewhereNote, Offer, ProductDetail } from "../api";
-import { useLink, useProducts, useStores, useUnlink } from "../hooks";
+import { useCategories, useLink, useProducts, useStores, useUnlink } from "../hooks";
+import { linkChoices } from "../scene";
 import { Price, UnitPrice } from "./Price";
 
 /** "₺40,00 cheaper at Watsons" on the home page. Nothing when no store is cheaper today. */
@@ -55,13 +56,13 @@ function OfferRow({ offer }: { offer: Offer }) {
 function LinkForm({ product }: { product: ProductDetail }) {
   const { data: products = [] } = useProducts();
   const { data: stores = [] } = useStores();
+  const { data: categories = [] } = useCategories();
   const link = useLink();
   const [open, setOpen] = useState(false);
   const [otherId, setOtherId] = useState("");
 
-  const grouped = new Set(product.elsewhere.map((o) => o.product_id));
-  const candidates = products.filter((p) => p.id !== product.id && !grouped.has(p.id));
-  if (candidates.length === 0) return null;
+  const choices = linkChoices(categories, products, product, product.linked_ids);
+  if (choices.length === 0) return null;
   const storeName = (key: string) => stores.find((s) => s.key === key)?.name ?? key;
 
   async function save(event: FormEvent) {
@@ -83,11 +84,17 @@ function LinkForm({ product }: { product: ProductDetail }) {
       <label>
         Same product at
         <select value={otherId} onChange={(e) => setOtherId(e.target.value)}>
-          <option value="">choose a product</option>
-          {candidates.map((p) => (
-            <option key={p.id} value={p.id}>
-              {storeName(p.store)}: {p.listing_name}
-            </option>
+          <option value="" disabled>
+            choose a product
+          </option>
+          {choices.map((group) => (
+            <optgroup key={group.label} label={group.label}>
+              {group.products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {storeName(p.store)}: {p.listing_name}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </label>

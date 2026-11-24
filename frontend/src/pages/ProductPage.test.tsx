@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Offer, PricePoint, Product, ProductDetail } from "../api";
+import type { Category, Offer, PricePoint, Product, ProductDetail } from "../api";
 import { ModeProvider } from "../mode";
 import { expectUnitPrice } from "../test-utils";
 import { ProductPage } from "./ProductPage";
@@ -54,6 +54,7 @@ export const detail = (overrides: Partial<ProductDetail> = {}): ProductDetail =>
   ],
   anomalies: [],
   elsewhere: [],
+  linked_ids: [],
   best_time: {
     enough_history: false,
     days_of_month: [],
@@ -65,7 +66,7 @@ export const detail = (overrides: Partial<ProductDetail> = {}): ProductDetail =>
   ...overrides,
 });
 
-export function renderProduct(product: ProductDetail, others: Product[] = []) {
+export function renderProduct(product: ProductDetail, others: Product[] = [], categories: Category[] = []) {
   const calls: { method: string; path: string; body: unknown }[] = [];
   vi.stubGlobal(
     "fetch",
@@ -78,7 +79,7 @@ export function renderProduct(product: ProductDetail, others: Product[] = []) {
         path === "/stores"
           ? [{ key: "gratis", name: "Gratis", domains: [] }]
           : path === "/categories"
-            ? []
+            ? categories
             : path === "/products"
               ? [product, ...others]
               : method === "PATCH"
@@ -347,6 +348,7 @@ describe("ProductPage elsewhere", () => {
         offer({}),
         offer({ product_id: 9, store: "rossmann", store_name: "Rossmann", price: 280.22, saving: -12, unit_price: null }),
       ],
+      linked_ids: [8, 9],
     });
 
   it("lists the same product at other stores, cheapest first, compared with this one", async () => {
@@ -395,6 +397,50 @@ describe("ProductPage elsewhere", () => {
     const section = await screen.findByRole("region", { name: "elsewhere" });
     await screen.findAllByRole("listitem");
     expect(within(section).queryByRole("button", { name: "Link another store" })).not.toBeInTheDocument();
+  });
+
+  it("doesn't offer a linked product that hasn't been checked yet", async () => {
+    renderProduct(detail({ linked_ids: [12] }), [detail({ id: 12 }), detail({ id: 13, listing_name: "Other" })]);
+    const section = await screen.findByRole("region", { name: "elsewhere" });
+    fireEvent.click(await within(section).findByRole("button", { name: "Link another store" }));
+    const values = within(section)
+      .getAllByRole("option")
+      .map((o) => (o as HTMLOptionElement).value);
+    expect(values).toEqual(["", "13"]);
+  });
+
+  it("starts on choose a product, with the link button off until one is picked", async () => {
+    renderProduct(detail(), [detail({ id: 12, store: "watsons" })]);
+    const section = await screen.findByRole("region", { name: "elsewhere" });
+    fireEvent.click(await within(section).findByRole("button", { name: "Link another store" }));
+    const select = within(section).getByRole("combobox", { name: "Same product at" });
+    expect(select).toHaveDisplayValue("choose a product");
+    const button = within(section).getByRole("button", { name: "Link products" });
+    expect(button).toBeDisabled();
+    fireEvent.change(select, { target: { value: "12" } });
+    expect(button).toBeEnabled();
+  });
+
+  it("lists the same room first, then the rest by floor", async () => {
+    const categories: Category[] = [
+      { id: 1, name: "Skincare", parent_id: null, color: "#E8B4B8" },
+      { id: 5, name: "Toners", parent_id: 1, color: "#E8B4B8" },
+      { id: 2, name: "Bath", parent_id: null, color: "#A8C8E0" },
+    ];
+    renderProduct(
+      detail({ category_id: 5 }),
+      [
+        detail({ id: 12, name: "Soap", listing_name: "Soap", category_id: 2 }),
+        detail({ id: 13, name: "Toner", listing_name: "Toner", category_id: 5 }),
+      ],
+      categories,
+    );
+    const section = await screen.findByRole("region", { name: "elsewhere" });
+    fireEvent.click(await within(section).findByRole("button", { name: "Link another store" }));
+    const groups = within(section).getAllByRole("group");
+    expect(groups.map((g) => g.getAttribute("label"))).toEqual(["Same room (Toners)", "Bath"]);
+    expect(within(groups[0]).getByRole("option")).toHaveTextContent("Toner");
+    expect(within(groups[1]).getByRole("option")).toHaveTextContent("Soap");
   });
 
   it("closes the link form again on cancel", async () => {

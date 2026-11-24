@@ -13,6 +13,7 @@ import {
   quietWeekLine,
   contrast,
   floorsOf,
+  linkChoices,
   inkOn,
   lighting,
   newsLine,
@@ -422,6 +423,50 @@ describe("floorsOf", () => {
     expect(floors[1].products.map((p) => p.name)).toEqual(["Coffee"]);
     expect(floors[2].products).toEqual([]);
     expect(floors[3].products.map((p) => p.name)).toEqual(["Mystery"]);
+  });
+});
+
+describe("linkChoices", () => {
+  const categories: Category[] = [
+    { id: 1, name: "Skincare", parent_id: null, color: "#E8B4B8" },
+    { id: 5, name: "Toners", parent_id: 1, color: "#E8B4B8" },
+    { id: 6, name: "Serums", parent_id: 1, color: "#E8B4B8" },
+    { id: 2, name: "Pantry", parent_id: null, color: "#C9D6A3" },
+    { id: 3, name: "Cleaning", parent_id: null, color: "#A8C8E0" },
+  ];
+  const here = product({ id: 1, name: "Miracle toner", category_id: 5 });
+  const others = [
+    here,
+    product({ id: 2, name: "Linked toner", category_id: 5 }),
+    product({ id: 3, name: "B toner", category_id: 5 }),
+    product({ id: 4, name: "A toner", category_id: 5 }),
+    product({ id: 5, name: "Serum", category_id: 6 }),
+    product({ id: 6, name: "Coffee", category_id: 2 }),
+    product({ id: 7, name: "Mystery", category_id: null }),
+  ];
+  const view = (groups: ReturnType<typeof linkChoices>) =>
+    groups.map((g) => [g.label, g.products.map((p) => p.name)]);
+
+  it("leaves out itself and its group, and puts the same room first, then floors", () => {
+    expect(view(linkChoices(categories, others, here, [2]))).toEqual([
+      ["Same room (Toners)", ["A toner", "B toner"]],
+      ["Skincare", ["Serum"]],
+      ["Pantry", ["Coffee"]],
+      ["No floor yet", ["Mystery"]],
+    ]);
+  });
+
+  it("only groups by floor when the product has no room", () => {
+    const loose = product({ id: 8, name: "Loose", category_id: 1 });
+    expect(view(linkChoices(categories, [loose, ...others.slice(4)], loose, []))).toEqual([
+      ["Skincare", ["Serum"]],
+      ["Pantry", ["Coffee"]],
+      ["No floor yet", ["Mystery"]],
+    ]);
+  });
+
+  it("is empty when everything is linked already", () => {
+    expect(linkChoices(categories, [here, others[1]], here, [2])).toEqual([]);
   });
 });
 

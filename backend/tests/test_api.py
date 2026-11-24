@@ -435,7 +435,17 @@ def test_unchecked_products_are_left_out_of_elsewhere(client, fake_pages):
     gratis = add_product(client).json()["id"]
     watsons = add_product(client, url=WATSONS_URL, name="Serum").json()["id"]
     client.post(f"/api/products/{gratis}/link", json={"other_id": watsons})
-    assert client.get(f"/api/products/{gratis}").json()["elsewhere"] == []
+    detail = client.get(f"/api/products/{gratis}").json()
+    assert detail["elsewhere"] == []
+    # Still in the group, so it isn't offered for linking again.
+    assert detail["linked_ids"] == [watsons]
+
+
+def test_linked_ids_list_the_whole_group(client, fake_pages):
+    gratis, watsons = two_stores(client, fake_pages)
+    assert client.get(f"/api/products/{gratis}").json()["linked_ids"] == [watsons]
+    client.delete(f"/api/products/{watsons}/link")
+    assert client.get(f"/api/products/{gratis}").json()["linked_ids"] == []
 
 
 def test_group_shares_the_most_complete_name(client, fake_pages):

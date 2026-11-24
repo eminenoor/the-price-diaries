@@ -308,6 +308,7 @@ def _to_detail(session: Session, product: Product, settings: Settings) -> Produc
         history=[PricePointOut.model_validate(p, from_attributes=True) for p in product.prices],
         anomalies=[AnomalyOut(**vars(a)) for a in price_anomalies(history)],
         elsewhere=_elsewhere(product, others, use_member),
+        linked_ids=sorted(p.id for p in others),
         best_time=_best_time(product, use_member, settings.current_date()),
     )
 

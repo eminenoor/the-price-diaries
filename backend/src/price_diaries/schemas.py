@@ -213,6 +213,10 @@ class ProductDetail(ProductOut):
     elsewhere: list[OfferOut] = Field(
         default_factory=list, description="The same product at other stores, cheapest first."
     )
+    linked_ids: list[int] = Field(
+        default_factory=list,
+        description="Every other product in its group, checked or not, by id.",
+    )
     best_time: BestTimeOut
 
 

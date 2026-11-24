@@ -163,6 +163,8 @@ export interface ProductDetail extends Product {
   anomalies: Anomaly[];
   /** The same product at other stores, cheapest first. */
   elsewhere: Offer[];
+  /** Every other product in its group, checked or not, by id. */
+  linked_ids: number[];
   best_time: BestTime;
 }
 

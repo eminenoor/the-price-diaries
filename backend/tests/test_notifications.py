@@ -440,7 +440,9 @@ async def test_sends_through_desktop_notifier_and_survives_failures(caplog):
 def test_notify_test_sends_one_notification(monkeypatch, desktop, capsys):
     monkeypatch.setattr(cli, "get_settings", lambda: Settings(desktop_notifications=True))
     assert cli.main(["notify", "test"]) == 0
-    assert len(desktop.sent) == 1
+    assert desktop.sent == [
+        ("The Price Diaries", "Notifications are working. You'll see price news here.")
+    ]
     assert "Sent a test notification." in capsys.readouterr().out
 
 

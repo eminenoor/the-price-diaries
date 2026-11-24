@@ -583,6 +583,37 @@ export function floorsOf(categories: Category[], products: Product[]): Floor[] {
   return floors;
 }
 
+export interface ChoiceGroup {
+  label: string;
+  products: Product[];
+}
+
+/**
+ * Products that could be linked with this one: not itself, nothing already in its group.
+ * Same room first, then the rest by floor (in floor order, then room, then name).
+ */
+export function linkChoices(
+  categories: Category[],
+  products: Product[],
+  product: Product,
+  linkedIds: number[],
+): ChoiceGroup[] {
+  const taken = new Set([product.id, ...linkedIds]);
+  const candidates = products.filter((p) => !taken.has(p.id));
+  const room = roomOf(categories, product);
+  const sameRoom = room
+    ? candidates.filter((p) => p.category_id === room.id).sort((a, b) => a.name.localeCompare(b.name))
+    : [];
+  const rest = candidates.filter((p) => !sameRoom.includes(p));
+
+  const groups: ChoiceGroup[] = [];
+  if (room && sameRoom.length) groups.push({ label: `Same room (${room.name})`, products: sameRoom });
+  for (const { floor, products: onFloor } of floorsOf(categories, rest)) {
+    if (onFloor.length) groups.push({ label: floor?.name ?? "No floor yet", products: onFloor });
+  }
+  return groups;
+}
+
 export function roomOf(categories: Category[], product: Product): Category | undefined {
   const c = categories.find((x) => x.id === product.category_id);
   return c && c.parent_id !== null ? c : undefined;
